@@ -1,1 +1,1 @@
-- Implement all multiply operations (UMAAL, UMULL, ...)
+- Implement all multiply instructions (UMAAL, UMULL, ...)
