@@ -76,7 +76,7 @@ void ARM_setFlag(ARM *cpu, int flag_mask, int val);
 
 // Exceptions
 void ARM_reset(ARM *cpu);
-void ARM_undefined(ARM *cpu);
+void ARM_undefined(ARM *cpu, char *why);
 void ARM_SWI(ARM *cpu);
 void ARM_prefAbort(ARM *cpu, char *why);
 void ARM_dataAbort(ARM *cpu, char *why);
