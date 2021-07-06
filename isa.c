@@ -126,9 +126,9 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 		case B: case BL:
 			sprintf(ret, "%s%s r15 + (%d)", info->mnemonic, &cond, info->offset); break;
 		case MUL:
-			sprintf(ret, "MUL%s r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs); break;
+			sprintf(ret, "MUL%s%s r%d, r%d, r%d", &cond, suffix, info->Rd, info->Rm, info->Rs); break;
 		case MLA:
-			sprintf(ret, "MLA%s r%d, r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs, info->Rn);
+			sprintf(ret, "MLA%s%s r%d, r%d, r%d, r%d", &cond, suffix, info->Rd, info->Rm, info->Rs, info->Rn);
 			break;
 		default: break;
 	}
