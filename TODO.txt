@@ -1,1 +1,2 @@
-- Implement all multiply instructions (UMAAL, UMULL, ...)
+- Multiply Long implementieren (Bit 23 als Long-bit designieren,
+  entsprechend dekodieren)
