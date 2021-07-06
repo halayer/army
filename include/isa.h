@@ -143,8 +143,8 @@ typedef struct ARMISA_Multiply {
 	WORD Rn:4;
 	WORD Rd:4;
 	WORD S:1;
-	WORD op:4;
-	WORD c1:3;
+	WORD A:1;
+	WORD c1:6;
 	WORD cond:4;
 } ARMISA_Multiply;
 
