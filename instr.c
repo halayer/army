@@ -2,7 +2,7 @@
 #include "isa.h"
 
 // Instructions
-#define ALU_UPDATE_FLAGS \
+#define UPDATE_FLAGS \
 	if (info->S) { ARM_setFlag(cpu, FLAG_N, res & 0x80000000); \
 				   ARM_setFlag(cpu, FLAG_Z, res == 0); }
 #define SHIFT switch (info->op2.shift_type) { \
@@ -29,7 +29,7 @@
 	} \
 	else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); }; \
 	uint64_t res = s; \
-	ALU_UPDATE_FLAGS;
+	UPDATE_FLAGS;
 #define DP_ARITHMETIC(s) \
 	WORD Op2; \
 	WORD Rd = info->Rd; \
@@ -42,7 +42,7 @@
 	uint64_t res = s; \
 	if (info->S) { ARM_setFlag(cpu, FLAG_C, (res > 0xFFFFFFFF)); \
 				   ARM_setFlag(cpu, FLAG_V, ((int64_t)res) < 0); } \
-	ALU_UPDATE_FLAGS;
+	UPDATE_FLAGS;
 	
 // Data processing
 int ARMISA_MOV(ARM *cpu, ARMISA_InstrInfo *info) {
@@ -132,40 +132,38 @@ int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
 }
 
 // Multiply
+#define MUL_DET_CYCLES \
+	if ((res >> 8 == 0xFFFFFF) || (res >> 8 == 0)) { m = 1; } \
+	else if ((res >> 16 == 0xFFFF) || (res >> 16 == 0)) { m = 2; } \
+	else if ((res >> 24 == 0xFF) || (res >> 24 == 0)) { m = 3; } \
+	else { m = 4; }
+
 int ARMISA_MUL(ARM *cpu, ARMISA_InstrInfo *info) {
+	if (info->Rd == info->Rm) {
+		ARM_undefined(cpu, "Rd == Rm");
+		return -1;
+	}
+	
 	int m = 0;
 	WORD res = cpu->r[info->Rd] = cpu->r[info->Rm] * cpu->r[info->Rs];
 	
-	if (info->S) {
-		ARM_setFlag(cpu, FLAG_Z, res == 0);
-		ARM_setFlag(cpu, FLAG_N, res & 0x80000000);
-	}
-	
-	if ((res >> 8 == 0xFFFFFF) || (res >> 8 == 0)) { m = 1; }
-	else if ((res >> 16 == 0xFFFF) || (res >> 16 == 0)) { m = 2; }
-	else if ((res >> 24 == 0xFF) || (res >> 24 == 0)) { m = 3; }
-	else { m = 4; }
+	MUL_DET_CYCLES
+	UPDATE_FLAGS
 	
 	cpu->instr_cycles = 1 + m;
 }
 
 int ARMISA_MLA(ARM *cpu, ARMISA_InstrInfo *info) {
+	if (info->Rd == info->Rm) {
+		ARM_undefined(cpu, "Rd == Rm");
+		return -1;
+	}
+	
 	int m = 0;
 	WORD res = cpu->r[info->Rd] = cpu->r[info->Rm] * cpu->r[info->Rs] + cpu->r[info->Rn];
 	
-	if (info->S) {
-		ARM_setFlag(cpu, FLAG_Z, res == 0);
-		ARM_setFlag(cpu, FLAG_N, res & 0x80000000);
-	}
-	
-	if ((res >> 8 == 0xFFFFFF) || (res >> 8 == 0)) { m = 1; }
-	else if ((res >> 16 == 0xFFFF) || (res >> 16 == 0)) { m = 2; }
-	else if ((res >> 24 == 0xFF) || (res >> 24 == 0)) { m = 3; }
-	else { m = 4; }
+	MUL_DET_CYCLES
+	UPDATE_FLAGS
 	
 	cpu->instr_cycles = 2 + m;
-}
-
-int ARMISA_UMAAL(ARM *cpu, ARMISA_InstrInfo *info) {
-	cpu->instr_cycles = 1;
 }

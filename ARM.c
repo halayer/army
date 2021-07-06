@@ -232,7 +232,8 @@ void ARM_reset(ARM *cpu) {
 	ARM_flushPipeline(cpu);
 }
 
-void ARM_undefined(ARM *cpu) {
+void ARM_undefined(ARM *cpu, char *why) {
+	if (cpu->debug) fprintf(cpu->debug, "UNDEFINED because %s\n", why);
 	cpu->r14_und = cpu->r[15];
 	ARM_switchMode(cpu, MODE_UNDEFINED);	// Switch into undefined mode
 	cpu->cpsr &= ~FLAG_T;
@@ -251,7 +252,7 @@ void ARM_SWI(ARM *cpu) {
 }
 
 void ARM_prefAbort(ARM *cpu, char *why) {
-	fprintf(cpu->debug, "PREFETCH ABORT because %s\n", why);
+	if (cpu->debug) fprintf(cpu->debug, "PREFETCH ABORT because %s\n", why);
 	cpu->r14_abt = cpu->r[15];
 	ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
 	cpu->cpsr &= ~FLAG_T;
@@ -261,7 +262,7 @@ void ARM_prefAbort(ARM *cpu, char *why) {
 }
 
 void ARM_dataAbort(ARM *cpu, char *why) {
-	fprintf(cpu->debug, "DATA ABORT because %s\n", why);
+	if (cpu->debug) fprintf(cpu->debug, "DATA ABORT because %s\n", why);
 	cpu->r14_abt = cpu->r[15];
 	ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
 	cpu->cpsr &= ~FLAG_T;

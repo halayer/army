@@ -78,18 +78,13 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
 			ret->offset = ((instr_data->branch.off ^ (1<<23)) - (1<<23)) << 2;
 		}
 		
-		if (instr_data->mult.c0 == 9 && instr_data->mult.c1 == 0) {
+		if (instr_data->mult.c0 == 9 && instr_data->mult.c1 == 0) { // Multiply
 			ret->Rm = instr_data->mult.Rm;
 			ret->Rs = instr_data->mult.Rs;
 			ret->Rn = instr_data->mult.Rn;
 			ret->Rd = instr_data->mult.Rd;
-			
-			switch (instr_data->mult.op) {
-				case 0: ret->lookup_index = MUL; break;
-				case 1: ret->lookup_index = MLA; break;
-				case 2: ret->lookup_index = UMAAL; break;
-				default: break;
-			}
+			ret->S = instr_data->mult.S;
+			ret->lookup_index = (instr_data->mult.A) ? MLA : MUL;
 		}
 	}
 	
@@ -134,9 +129,6 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 			sprintf(ret, "MUL%s r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs); break;
 		case MLA:
 			sprintf(ret, "MLA%s r%d, r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs, info->Rn);
-			break;
-		case UMAAL:
-			sprintf(ret, "UMAAL%s r%d, r%d, r%d, r%d", &cond, info->Rn, info->Rd, info->Rm, info->Rs);
 			break;
 		default: break;
 	}
