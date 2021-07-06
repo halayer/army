@@ -24,12 +24,10 @@ int ARMISA_B(ARM *cpu, ARMISA_InstrInfo *info);
 int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info);
 int ARMISA_MUL(ARM *cpu, ARMISA_InstrInfo *info);
 int ARMISA_MLA(ARM *cpu, ARMISA_InstrInfo *info);
-int ARMISA_UMAAL(ARM *cpu, ARMISA_InstrInfo *info);
 
 enum ARMISA_mnemonic {
 	AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC,	TST, TEQ,
 	CMP, CMN, ORR, MOV, BIC, MVN, B,   BL,  MUL, MLA,
-	UMAAL
 };
 
 cycleFunc instr_func_lookup[] = {
@@ -37,13 +35,11 @@ cycleFunc instr_func_lookup[] = {
 	ARMISA_ADC, ARMISA_SBC, ARMISA_RSC, ARMISA_TST, ARMISA_TEQ,
 	ARMISA_CMP, ARMISA_CMN, ARMISA_ORR, ARMISA_MOV, ARMISA_BIC,
 	ARMISA_MVN, ARMISA_B,	ARMISA_BL,	ARMISA_MUL,	ARMISA_MLA,
-	ARMISA_UMAAL
 };
 
 char *mnemonic_lookup[] = {
 	"AND", "EOR", "SUB", "RSB", "ADD", "ADC", "SBC", "RSC", "TST", "TEQ",
 	"CMP", "CMN", "ORR", "MOV", "BIC", "MVN", "B",	 "BL",	"MUL", "MLA",
-	"UMAAL"
 };
 
 #endif
