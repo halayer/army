@@ -24,7 +24,7 @@ int main() {
 	ram.mem[0] = ((WORD *)"\x05\x00\xa0\xe3")[0];
 	ram.mem[1] = ((WORD *)"\x01\x10\xa0\xe3")[0];
 	ram.mem[2] = ((WORD *)"\x06\x20\xa0\xe3")[0];
-	ram.mem[3] = ((WORD *)"\x90\x21\x23\xe0")[0];
+	ram.mem[3] = ((WORD *)"\x91\x02\xef\xe0")[0];
 	
 	Bus_registerComponent(bus, (void *)cpu);
 	Bus_registerComponent(bus, (void *)&ram);
