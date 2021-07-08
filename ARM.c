@@ -38,7 +38,8 @@ int ARM_cycle(ARM *cpu) {
 				// Execute instruction on last cycle
 				if (cpu->current_cycle == cpu->pipeline.size - 1) {
 					if (cpu->debug)
-						fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+						fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
+							ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
 					f(cpu, ARMISA_getInstrInfo(cpu->cpsr & FLAG_T, cpu->instr));	// Execute instruction
 					cpu->pipeline.flushed = 0;
 					goto instr_complete;
@@ -49,7 +50,8 @@ int ARM_cycle(ARM *cpu) {
 			if (ARM_prefetch(cpu) != 0)
 				return 0;
 			
-			if (cpu->debug) fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+			if (cpu->debug) fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
+				ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
 			f(cpu, ARMISA_getInstrInfo(cpu->cpsr & FLAG_T, cpu->instr));	// Execute instruction
 		}
 		
