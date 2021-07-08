@@ -9,22 +9,6 @@ char *ARMISA_cond2string(enum ARMISA_Cond cond) {
 	return strings[cond];
 }
 
-char *ARMISA_data_proc_opcode2mnemonic(enum ARMISA_DataProc_Opcode opcode) {
-	char *strings[] = {"AND", "EOR", "SUB", "RSB", "ADD", "ADC", "SBC", "RSC", "TST", "TEQ", "CMP", "CMN", "ORR", "MOV", "BIC", "MVN"};
-	return strings[opcode];
-}
-
-int ARMISA_mnemonic2data_proc_opcode(char *mnemonic) {
-	char *strings[] = {"AND", "EOR", "SUB", "RSB", "ADD", "ADC", "SBC", "RSC", "TST", "TEQ", "CMP", "CMN", "ORR", "MOV", "BIC", "MVN"};
-	
-	for (int i = 0; i < 16; i++) {
-		if (strcmp(strings[i], mnemonic))
-			return i;
-	}
-	
-	return -1;
-}
-
 cycleFunc ARMISA_getInstrFunc(int thumb, WORD instr) {
 	ARMISA_InstrInfo *info = ARMISA_getInstrInfo(thumb, instr);
 	
@@ -44,7 +28,6 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
 		if (instr_data->data_proc.c0 == 0) {	// Data processing instruction
 			// Data processing instruction
 			ret->lookup_index = instr_data->data_proc.op;
-			ret->mnemonic = ARMISA_data_proc_opcode2mnemonic(instr_data->data_proc.op);
 			ret->type = InstrType_Data_Proc;
 			ret->Rd = instr_data->data_proc.Rd;
 			ret->Rn = instr_data->data_proc.Rn;
@@ -75,16 +58,28 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
 		
 		if (instr_data->branch.c0 == 5) { // Branch
 			ret->lookup_index = instr_data->branch.L ? BL : B;
+			ret->type = InstrType_Branch;
 			ret->offset = ((instr_data->branch.off ^ (1<<23)) - (1<<23)) << 2;
 		}
 		
 		if (instr_data->mult.c0 == 9 && instr_data->mult.c1 == 0) { // Multiply
+			ret->type = InstrType_Multiply;
 			ret->Rm = instr_data->mult.Rm;
 			ret->Rs = instr_data->mult.Rs;
 			ret->Rn = instr_data->mult.Rn;
 			ret->Rd = instr_data->mult.Rd;
 			ret->S = instr_data->mult.S;
-			ret->lookup_index = (instr_data->mult.A) ? MLA : MUL;
+			
+			if (!instr_data->mult.L) {
+				ret->lookup_index = (instr_data->mult.A) ? MLA : MUL;
+				return ret;
+			}
+			
+			if (instr_data->mult.A) {
+				ret->lookup_index = (instr_data->mult.U) ? SMLAL : UMLAL;
+			} else {
+				ret->lookup_index = (instr_data->mult.U) ? SMULL : UMULL;
+			}
 		}
 	}
 	
@@ -93,6 +88,7 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
 
 char *ARMISA_disasm(int thumb, WORD instr) {
 	ARMISA_InstrInfo *info = ARMISA_getInstrInfo(thumb, instr);
+	char *mnemonic = mnemonic_lookup[info->lookup_index];
 	char *ret = malloc(64); memset((void *)ret, 0, 64);
 	char op2[16] = {0};
 	char cond[3] = {0};
@@ -116,43 +112,25 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 	
 	switch (info->lookup_index) {
 		case MOV: case MVN:
-			sprintf(ret, "%s%s%s r%d, %s", info->mnemonic, &cond, suffix, info->Rd, &op2); break;
+			sprintf(ret, "%s%s%s r%d, %s", mnemonic, &cond, suffix, info->Rd, &op2); break;
 		case ORR: case EOR: case AND: case BIC: case ADD: case ADC:
 		case SUB: case SBC: case RSB: case RSC:
-			sprintf(ret, "%s%s%s r%d, r%d, %s", info->mnemonic, &cond, suffix, info->Rd, info->Rn, &op2);
+			sprintf(ret, "%s%s%s r%d, r%d, %s", mnemonic, &cond, suffix, info->Rd, info->Rn, &op2);
 			break;
 		case TST: case TEQ: case CMP: case CMN:
-			sprintf(ret, "%s%s%s r%d, %s", info->mnemonic, &cond, suffix, info->Rn, &op2); break;
+			sprintf(ret, "%s%s%s r%d, %s", mnemonic, &cond, suffix, info->Rn, &op2); break;
 		case B: case BL:
-			sprintf(ret, "%s%s r15 + (%d)", info->mnemonic, &cond, info->offset); break;
+			sprintf(ret, "%s%s r15 + (%d)", mnemonic, &cond, info->offset); break;
 		case MUL:
 			sprintf(ret, "MUL%s%s r%d, r%d, r%d", &cond, suffix, info->Rd, info->Rm, info->Rs); break;
 		case MLA:
 			sprintf(ret, "MLA%s%s r%d, r%d, r%d, r%d", &cond, suffix, info->Rd, info->Rm, info->Rs, info->Rn);
 			break;
+		case UMULL: case SMULL: case UMLAL: case SMLAL:
+			sprintf(ret, "%s%s%s r%d, r%d, r%d, r%d", mnemonic, &cond, suffix, info->Rn, info->Rd, info->Rm, info->Rs);
+			break;
 		default: break;
 	}
-	
-	/*if (!strcmp(info->mnemonic, "MOV") || !strcmp(info->mnemonic, "MVN")) {
-		// POTENTIAL OPTIMIZATION: Merge MOV & MVN with TST & TEQ ..., and instead of
-		// passing Rd, pass Rn
-		sprintf(ret, "%s%s%s r%d, %s", info->mnemonic, &cond, suffix, info->Rd, &op2);
-	} else if (!strcmp(info->mnemonic, "ORR") || !strcmp(info->mnemonic, "EOR") ||
-		!strcmp(info->mnemonic, "AND") || !strcmp(info->mnemonic, "BIC") ||
-		!strcmp(info->mnemonic, "ADD") || !strcmp(info->mnemonic, "ADC") ||
-		!strcmp(info->mnemonic, "SUB") || !strcmp(info->mnemonic, "SBC") ||
-		!strcmp(info->mnemonic, "RSB") || !strcmp(info->mnemonic, "RSC")) {
-		sprintf(ret, "%s%s%s r%d, r%d, %s", info->mnemonic, &cond, suffix, info->Rd, info->Rn, &op2);
-	} else if (!strcmp(info->mnemonic, "TST") || !strcmp(info->mnemonic, "TEQ") ||
-		!strcmp(info->mnemonic, "CMP") || !strcmp(info->mnemonic, "CMN")) {
-		sprintf(ret, "%s%s%s r%d, %s", info->mnemonic, &cond, suffix, info->Rn, &op2);
-	} else if (!strcmp(info->mnemonic, "B") || !strcmp(info->mnemonic, "BL")) {
-		sprintf(ret, "%s%s r15 + (%d)", info->mnemonic, &cond, info->offset);
-	} else if (!strcmp(info->mnemonic, "MUL")) {
-		sprintf(ret, "MUL%s r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs);
-	} else if (!strcmp(info->mnemonic, "MLA")) {
-		sprintf(ret, "MLA%s r%d, r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs, info->Rn);
-	}*/
 	
 	return ret;
 }
