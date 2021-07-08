@@ -1,2 +1,1 @@
-- Multiply Long implementieren (Bit 23 als Long-bit designieren,
-  entsprechend dekodieren)
+- implement condition checking
