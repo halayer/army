@@ -47,7 +47,6 @@ enum ARMISA_DataProc_Opcode {
 	DP_BIC = 14,
 	DP_MVN = 15
 };
-char *ARMISA_data_proc_opcode2mnemonic(enum ARMISA_DataProc_Opcode opcode);
 
 enum ARMISA_InstrType {
 	InstrType_Data_Proc = 0,
@@ -144,7 +143,9 @@ typedef struct ARMISA_Multiply {
 	WORD Rd:4;
 	WORD S:1;
 	WORD A:1;
-	WORD c1:6;
+	WORD U:1;
+	WORD L:1;
+	WORD c1:4;
 	WORD cond:4;
 } ARMISA_Multiply;
 
@@ -164,8 +165,7 @@ typedef struct ARMISA_OperandInfo {
 } ARMISA_OperandInfo;
 
 typedef struct ARMISA_InstrInfo {
-	enum ARMISA_InstrType type;	
-	char *mnemonic;
+	enum ARMISA_InstrType type;
 	char cond[3];
 	int Rd;
 	int Rm;
