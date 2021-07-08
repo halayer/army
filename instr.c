@@ -137,10 +137,21 @@ int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
 	else if ((res >> 16 == 0xFFFF) || (res >> 16 == 0)) { m = 2; } \
 	else if ((res >> 24 == 0xFF) || (res >> 24 == 0)) { m = 3; } \
 	else { m = 4; }
+#define MUL_R15_CHECK \
+	if ((info->Rd == 15) || (info->Rm == 15) || (info->Rs == 15) || \
+	    (info->Rn == 15)) { \
+		ARM_undefined(cpu, "r15 must not be used as a register"); \
+		return -1; \
+	}
 
 int ARMISA_MUL(ARM *cpu, ARMISA_InstrInfo *info) {
 	if (info->Rd == info->Rm) {
 		ARM_undefined(cpu, "Rd == Rm");
+		return -1;
+	}
+	
+	if ((info->Rd == 15) || (info->Rm == 15) || (info->Rs == 15)) {
+		ARM_undefined(cpu, "r15 must not be used as a register");
 		return -1;
 	}
 	
@@ -158,6 +169,7 @@ int ARMISA_MLA(ARM *cpu, ARMISA_InstrInfo *info) {
 		ARM_undefined(cpu, "Rd == Rm");
 		return -1;
 	}
+	MUL_R15_CHECK
 	
 	int m = 0;
 	WORD res = cpu->r[info->Rd] = cpu->r[info->Rm] * cpu->r[info->Rs] + cpu->r[info->Rn];
@@ -166,4 +178,60 @@ int ARMISA_MLA(ARM *cpu, ARMISA_InstrInfo *info) {
 	UPDATE_FLAGS
 	
 	cpu->instr_cycles = 2 + m;
+}
+
+int ARMISA_UMULL(ARM *cpu, ARMISA_InstrInfo *info) {
+	MUL_R15_CHECK
+	
+	uint64_t res = cpu->r[info->Rm] * cpu->r[info->Rs];
+	cpu->r[info->Rn] = res & 0xFFFFFFFF;
+	cpu->r[info->Rd] = res >> 32;
+	
+	int m = 0;
+	if (res >> 8 == 0) { m = 1; }
+	else if (res >> 16 == 0) { m = 2; } \
+	else if (res >> 24 == 0) { m = 3; } \
+	else { m = 4; }
+	cpu->instr_cycles = 2 + m;
+}
+
+int ARMISA_SMULL(ARM *cpu, ARMISA_InstrInfo *info) {
+	MUL_R15_CHECK
+	
+	int64_t res = (int32_t)cpu->r[info->Rm] * (int32_t)cpu->r[info->Rs];
+	cpu->r[info->Rn] = ((uint64_t)res) & 0xFFFFFFFF;
+	cpu->r[info->Rd] = ((uint64_t)res) >> 32;
+	
+	int m = 0;
+	MUL_DET_CYCLES
+	cpu->instr_cycles = 2 + m;
+}
+
+int ARMISA_UMLAL(ARM *cpu, ARMISA_InstrInfo *info) {
+	MUL_R15_CHECK
+	
+	uint64_t res = cpu->r[info->Rm] * cpu->r[info->Rs] + \
+		(uint64_t)(cpu->r[info->Rn] | ((uint64_t)cpu->r[info->Rd] << 32));
+	cpu->r[info->Rn] = res & 0xFFFFFFFF;
+	cpu->r[info->Rd] = res >> 32;
+	
+	int m = 0;
+	if (res >> 8 == 0) { m = 1; }
+	else if (res >> 16 == 0) { m = 2; } \
+	else if (res >> 24 == 0) { m = 3; } \
+	else { m = 4; }
+	cpu->instr_cycles = 3 + m;
+}
+
+int ARMISA_SMLAL(ARM *cpu, ARMISA_InstrInfo *info) {
+	MUL_R15_CHECK
+	
+	int64_t res = (int32_t)cpu->r[info->Rm] * (int32_t)cpu->r[info->Rs] + \
+		(int64_t)(cpu->r[info->Rn] | ((int64_t)cpu->r[info->Rd] << 32));
+	cpu->r[info->Rn] = ((uint64_t)res) & 0xFFFFFFFF;
+	cpu->r[info->Rd] = ((uint64_t)res) >> 32;
+	
+	int m = 0;
+	MUL_DET_CYCLES
+	cpu->instr_cycles = 3 + m;
 }
