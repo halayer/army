@@ -12,13 +12,38 @@ int dbg_cycle(ARM *cpu) {
 	return 0;
 }
 
-ARM *ARM_new() {
+ARM *ARM_new(int arch) {
 	ARM *cpu = (ARM *)malloc(sizeof(ARM));
 	memset((void *)cpu, 0, sizeof(ARM));
 	
-	cpu->pipeline.size = 3;
+	cpu->arch = arch;
+	cpu->pipeline.size = (arch == ARCH_ARM7) ? 3 : 5;
 	
 	return cpu;
+}
+
+int ARM_checkCondition(ARM *cpu, int cond) {
+	switch (cond) {
+		case AL: return 1;
+		case NV: return 0;
+		case EQ: return ARM_getFlag(cpu, FLAG_Z);
+		case NE: return !ARM_getFlag(cpu, FLAG_Z);
+		case CS: return ARM_getFlag(cpu, FLAG_C);
+		case CC: return !ARM_getFlag(cpu, FLAG_C);
+		case MI: return ARM_getFlag(cpu, FLAG_N);
+		case PL: return !ARM_getFlag(cpu, FLAG_N);
+		case VS: return ARM_getFlag(cpu, FLAG_V);
+		case VC: return !ARM_getFlag(cpu, FLAG_V);
+		case HI: return (ARM_getFlag(cpu, FLAG_C) && (!ARM_getFlag(cpu, FLAG_Z)));
+		case LS: return ((!ARM_getFlag(cpu, FLAG_C)) || ARM_getFlag(cpu, FLAG_Z));
+		case GE: return ARM_getFlag(cpu, FLAG_N) == ARM_getFlag(cpu, FLAG_V);
+		case LT: return ARM_getFlag(cpu, FLAG_N) != ARM_getFlag(cpu, FLAG_V);
+		case GT: return ((!ARM_getFlag(cpu, FLAG_Z)) && (ARM_getFlag(cpu, FLAG_N) == \
+			ARM_getFlag(cpu, FLAG_V)));
+		case LE: return (ARM_getFlag(cpu, FLAG_Z) || (ARM_getFlag(cpu, FLAG_N) != \
+			ARM_getFlag(cpu, FLAG_V)));
+		default: break;
+	}
 }
 
 int ARM_cycle(ARM *cpu) {
@@ -40,6 +65,10 @@ int ARM_cycle(ARM *cpu) {
 					if (cpu->debug)
 						fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
 							ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+					
+					if (!ARM_checkCondition(cpu, cpu->instr >> 28))
+						goto instr_complete;
+					
 					f(cpu, ARMISA_getInstrInfo(cpu->cpsr & FLAG_T, cpu->instr));	// Execute instruction
 					cpu->pipeline.flushed = 0;
 					goto instr_complete;
@@ -52,6 +81,10 @@ int ARM_cycle(ARM *cpu) {
 			
 			if (cpu->debug) fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
 				ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+			
+			if (!ARM_checkCondition(cpu, cpu->instr >> 28))
+				goto instr_complete;
+			
 			f(cpu, ARMISA_getInstrInfo(cpu->cpsr & FLAG_T, cpu->instr));	// Execute instruction
 		}
 		
