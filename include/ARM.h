@@ -62,7 +62,8 @@ typedef struct ARM {
 
 int dbg_cycle(ARM *cpu);
 
-ARM *ARM_new();
+ARM *ARM_new(int arch);
+int ARM_checkCondition(ARM *cpu, int cond);
 int ARM_cycle(ARM *cpu);
 int ARM_step(ARM *cpu);
 void ARM_switchMode(ARM *cpu, int new_mode);
