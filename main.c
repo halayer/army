@@ -10,24 +10,29 @@ typedef struct RAM {
 	WORD *mem;
 } RAM;
 
+int RAM_checkAddrSpace(void *inst, WORD addr) { return 1; }
+WORD RAM_readWord(void *inst, WORD addr) { return ((RAM *)inst)->mem[addr >> 2]; }
+int RAM_writeWord(void *inst, WORD addr, WORD data) { ((RAM *)inst)->mem[addr >> 2] = data; }
+
 int main() {
 	Bus *bus = Bus_new();
-	ARM *cpu = ARM_new();
+	ARM *cpu = ARM_new(ARCH_ARM9);
 	RAM ram;
+	Component ram_comp = {1, RAM_checkAddrSpace, RAM_readWord, RAM_writeWord};
+	ram_comp.inst = &ram;
 	
-	cpu->arch = ARCH_ARM9;
 	cpu->debug = stdout;
+	cpu->bus = bus;
 	
 	ram.mem = malloc(512);
 	memset(ram.mem, 0, 512);
 	
 	ram.mem[0] = ((WORD *)"\x05\x00\xa0\xe3")[0];
-	ram.mem[1] = ((WORD *)"\x01\x10\xa0\xe3")[0];
-	ram.mem[2] = ((WORD *)"\x06\x20\xa0\xe3")[0];
-	ram.mem[3] = ((WORD *)"\x91\x02\xef\xe0")[0];
+	ram.mem[1] = ((WORD *)"\x01\x10\xa0\x03")[0];
+	ram.mem[2] = ((WORD *)"\x06\x20\xa0\x03")[0];
+	ram.mem[3] = ((WORD *)"\x01\x00\xa0\xe1")[0];
 	
-	Bus_registerComponent(bus, (void *)cpu);
-	Bus_registerComponent(bus, (void *)&ram);
+	Bus_registerComponent(bus, &ram_comp);
 	
 	ARM_reset(cpu);
 	
