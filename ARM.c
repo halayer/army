@@ -220,7 +220,7 @@ int ARM_prefetch(ARM *cpu) {
 		return -1;
 	}
 	
-	cpu->next_instr = Bus_read(cpu->bus, cpu->r[15], NULL);
+	cpu->next_instr = Bus_read32(cpu->bus, cpu->r[15], NULL);
 	cpu->next_instr_addr = cpu->r[15];
 	
 	cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;
@@ -234,7 +234,7 @@ int ARM_fetch(ARM *cpu) {
 		return -1;
 	}
 	
-	cpu->instr = Bus_read(cpu->bus, cpu->r[15], NULL);
+	cpu->instr = Bus_read32(cpu->bus, cpu->r[15], NULL);
 	cpu->next_instr_addr = cpu->r[15];
 	
 	cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;
