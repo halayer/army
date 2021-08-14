@@ -7,13 +7,13 @@
 typedef struct Component {
 	int has_addr_space;	// Indicates whether the component occupies any address space.
 	int (*is_in_addr_space)(void *inst, WORD addr);	// Must return 1 when the given address is in the
-													// component's address space, otherwise 0.
+							// component's address space, otherwise 0.
 	WORD (*read_word)(void *inst, WORD addr);	// Read a byte from the component's address space.
 	int (*write_word)(void *inst, WORD addr, WORD data);	// Write a byte to the component's address space.
 	int (*read_area)(void *inst, WORD addr, int size, void *dst);	// Read from an area of the component's address
-																	// space, the size is given in amount of WORDs.
+									// space, the size is given in amount of WORDs.
 	int (*write_area)(void *inst, WORD addr, int size, void *src);	// Overwrite an area of the component's address
-																	// space, the size is given in amount of WORDs.
+									// space, the size is given in amount of WORDs.
 	void *inst;	// Component instance, which is passed to the callback functions.
 } Component;
 
