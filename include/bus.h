@@ -11,9 +11,9 @@ typedef struct Component {
 	WORD (*read_word)(void *inst, WORD addr);	// Read a byte from the component's address space.
 	int (*write_word)(void *inst, WORD addr, WORD data);	// Write a byte to the component's address space.
 	int (*read_area)(void *inst, WORD addr, int size, void *dst);	// Read from an area of the component's address
-																	// space.
+																	// space, the size is given in amount of WORDs.
 	int (*write_area)(void *inst, WORD addr, int size, void *src);	// Overwrite an area of the component's address
-																	// space.
+																	// space, the size is given in amount of WORDs.
 	void *inst;	// Component instance, which is passed to the callback functions.
 } Component;
 
