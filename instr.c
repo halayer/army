@@ -16,7 +16,7 @@
 			Op2 = ROR(info->op2.value, info->op2.shift_src); break; \
 	}
 #define DP_LOGICAL(s) \
-	WORD Op2; \
+	WORD Op2 = info->op2.value; \
 	WORD Rd = info->Rd; \
 	WORD Rn = info->Rn; \
 	cpu->instr_cycles = 1; \
@@ -27,22 +27,22 @@
 			info->op2.shift_src = cpu->r[info->Rs]; \
 		SHIFT \
 	} \
-	else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); }; \
 	uint64_t res = s; \
 	UPDATE_FLAGS;
+	//else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); };
 #define DP_ARITHMETIC(s) \
-	WORD Op2; \
+	WORD Op2 = info->op2.value; \
 	WORD Rd = info->Rd; \
 	WORD Rn = info->Rn; \
 	cpu->instr_cycles = 1; \
 	if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
 	if (Rd == 15) cpu->instr_cycles += 2; \
 	if (info->op2.type == OperandType_Register) { Op2 = cpu->r[info->op2.value]; } \
-	else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); }; \
 	uint64_t res = s; \
 	if (info->S) { ARM_setFlag(cpu, FLAG_C, (res > 0xFFFFFFFF)); \
 				   ARM_setFlag(cpu, FLAG_V, ((int64_t)res) < 0); } \
 	UPDATE_FLAGS;
+	//else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); };
 	
 // Data processing
 int ARMISA_MOV(ARM *cpu, ARMISA_InstrInfo *info) {
@@ -235,3 +235,6 @@ int ARMISA_SMLAL(ARM *cpu, ARMISA_InstrInfo *info) {
 	MUL_DET_CYCLES
 	cpu->instr_cycles = 3 + m;
 }
+
+int ARMISA_LDR(ARM *cpu, ARMISA_InstrInfo *info) {}
+int ARMISA_STR(ARM *cpu, ARMISA_InstrInfo *info) {}
