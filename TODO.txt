@@ -1,2 +1,2 @@
-- implement a proper bus with address spaces etc.
-- make the callback functions read & write WORDs at a time, not bytes
+- LDR & STR implementieren
+- Register-verschobenen zweiten Operanden disassemblieren
