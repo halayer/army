@@ -52,7 +52,7 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
 				ret->op2.shift_type = ShiftType_Rotate_Right;		// always rotated right by
 				ret->op2.shift_src_type = ShiftSrcType_Immediate;	// an immediate value
 				ret->op2.shift_src = imm_op->rotate;
-				ret->op2.value = imm_op->val;
+				ret->op2.value = ROR(imm_op->val, (imm_op->rotate << 1));
 			}
 		}
 		
@@ -81,6 +81,35 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
 				ret->lookup_index = (instr_data->mult.U) ? SMULL : UMULL;
 			}
 		}
+		
+		if (instr_data->data_trns.c0 == 1) { // Single Data Transfer
+			ret->lookup_index = instr_data->data_trns.L ? LDR : STR;
+			ret->Rd = instr_data->data_trns.Rd;
+			ret->Rn = instr_data->data_trns.Rn;
+			ret->W = instr_data->data_trns.W;
+			ret->B = instr_data->data_trns.B;
+			ret->U = instr_data->data_trns.U;
+			ret->P = instr_data->data_trns.P;
+			
+			// Identify type of offset
+			if (!instr_data->data_trns.I) {	// Register
+				ret->op2.type = OperandType_Register;
+				ret->op2.shift_type = reg_op->shift.imm.type;
+				ret->Rm = ret->op2.value = reg_op->Rm;
+				
+				// Identify shift type
+				if (reg_op->shift.imm.c0 == 0) {	// Shifted by immediate value
+					ret->op2.shift_src_type = ShiftSrcType_Immediate;
+					ret->op2.shift_src = reg_op->shift.imm.amount;
+				} else if (reg_op->shift.reg.c0 == 1 && reg_op->shift.reg.c1 == 0) {	// Shifted by register
+					ret->op2.shift_src_type = ShiftSrcType_Rs;
+					ret->Rs = ret->op2.shift_src = reg_op->shift.reg.Rs;
+				}
+			} else {
+				ret->op2.type = OperandType_Immediate;
+				ret->op2.value = imm_op->val;
+			}
+		}
 	}
 	
 	return ret;
@@ -90,9 +119,9 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 	ARMISA_InstrInfo *info = ARMISA_getInstrInfo(thumb, instr);
 	char *mnemonic = mnemonic_lookup[info->lookup_index];
 	char *ret = malloc(64); memset((void *)ret, 0, 64);
-	char op2[16] = {0};
-	char cond[3] = {0};
-	char suffix[2] = {0};
+	char op2[16];
+	char cond[3];
+	char suffix[2];
 	
 	if (strcmp((char *)&info->cond, "AL") != 0)
 		strcpy((char *)&cond, (char *)&info->cond);
@@ -104,6 +133,7 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 	}
 	
 	if (info->S) suffix[0] = 83;	// "S"
+	
 	
 	if (info->lookup_index == MLA) {
 		sprintf(ret, "MLA%s r%d, r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs, info->Rn);
@@ -129,6 +159,10 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 		case UMULL: case SMULL: case UMLAL: case SMLAL:
 			sprintf(ret, "%s%s%s r%d, r%d, r%d, r%d", mnemonic, &cond, suffix, info->Rn, info->Rd, info->Rm, info->Rs);
 			break;
+		case LDR: case STR:
+			
+			sprintf(ret, "%s%s%s%s r%d, %s", mnemonic, (info->B) ? "B" : "", (info->W && !info->P) ? "T" : "", &cond,
+				info->Rd, &op2); break;
 		default: break;
 	}
 	
