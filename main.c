@@ -29,19 +29,19 @@ int main() {
 	ram.mem = malloc(512);
 	memset(ram.mem, 0, 512);
 	
-	// MOV r0, #5
-	// MOVEQ r1, #1
-	// MOVEQ r2, #6
+	// LDR r0, [r15]
+	// MOV r0, #0x80000000
+	// MOV r0, r1, LSR r2
 	// MOV r0, r1
-	RAM_writeArea((void *)&ram, 0, 4, (void *)((WORD *)"\x05\x00\xa0\xe3\x01\x10\xa0\x03\x06\x20\xa0\x03\x01\x00\xa0\xe1"));
+	RAM_writeArea((void *)&ram, 0, 4, (void *)((WORD *)"\x00\x10\x9f\xe5\x02\x01\xa0\xe3\x31\x02\xa0\xe1\x01\x00\xa0\xe1"));
 	
 	Bus_registerComponent(bus, &ram_comp);
 	
 	ARM_reset(cpu);
 	
-	while (getchar() != 104) {	// "H"
+	do {
 		ARM_step(cpu);
-	}
+	} while (getchar() != 104); // "H"
 	
 	ARM_registerDump(cpu);
 	
