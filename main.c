@@ -29,19 +29,29 @@ int main() {
     ram.mem = malloc(512);
     memset(ram.mem, 0, 512);
 
-    // LDR r0, [r2], r1, ASR #5
-    // MOV r0, #0x80000000
-    // MOV r0, r1, LSR r2
-    // MOV r0, r1
-    RAM_writeArea((void *)&ram, 0, 4, (void *)((WORD *)"\xc1\x02\x92\xe6\x02\x01\xa0\xe3\x31\x02\xa0\xe1\x01\x00\xa0\xe1"));
+    /* MOV r0, #8
+    MOV r1, #5
+    MOV r2, #0
+
+    loop:
+    SUBS r0, r0, r1
+    ADD r2, r2, #1
+
+    BPL loop
+    SUB r2, r2, #1*/
+    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\x08\x00\xa0\xe3\x05\x10\xa0\xe3\x00\x20\xa0\xe3\x01\x00\x50\xe0\x01\x20\x82\xe2\xfc\xff\xff\x5a\x01\x20\x42\xe2"));
 
     Bus_registerComponent(bus, &ram_comp);
 
     ARM_reset(cpu);
+    
+    char c;
+    int running = 1;
+    WORD addr;
 
     do {
         ARM_step(cpu);
-    } while (getchar() != 104); // "H"
+    } while (getchar() != 104);
 
     ARM_registerDump(cpu);
 
