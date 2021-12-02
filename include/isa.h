@@ -218,8 +218,8 @@ typedef struct ARMISA_InstrInfo {
 
 typedef int (*cycleFunc)(ARM *cpu, ARMISA_InstrInfo *info);
 
-cycleFunc ARMISA_getInstrFunc(int thumb, WORD instr);
-ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr);
-char *ARMISA_disasm(int thumb, WORD instr);
+cycleFunc ARMISA_getInstrFunc(ARM *cpu, WORD instr);
+ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr);
+char *ARMISA_disasm(ARM *cpu, WORD instr);
 
 #endif
