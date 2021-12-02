@@ -9,13 +9,13 @@ char *ARMISA_cond2string(enum ARMISA_Cond cond) {
     return strings[cond];
 }
 
-cycleFunc ARMISA_getInstrFunc(int thumb, WORD instr) {
-    ARMISA_InstrInfo *info = ARMISA_getInstrInfo(thumb, instr);
+cycleFunc ARMISA_getInstrFunc(ARM *cpu, WORD instr) {
+    ARMISA_InstrInfo *info = ARMISA_getInstrInfo(cpu, instr);
 
     return instr_func_lookup[info->lookup_index];
 }
 
-ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
+ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
     ARMISA_Instr *instr_data = (ARMISA_Instr *)&instr;
     ARMISA_ImmOperand *imm_op = (ARMISA_ImmOperand *)&instr;
     ARMISA_RegOperand *reg_op = (ARMISA_RegOperand *)&instr;
@@ -23,7 +23,7 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
     memset((void *)ret, 0, sizeof(ARMISA_InstrInfo));
     strcpy((char *)&ret->cond, ARMISA_cond2string(instr_data->data_proc.cond));
 
-    if (!thumb) {
+    if (!(cpu->cpsr & FLAG_T)) {
         // Identify instruction type
         if (instr_data->data_proc.c0 == 0) {	// Data processing instruction
             // Data processing instruction
@@ -54,12 +54,16 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
                 ret->op2.shift_src = imm_op->rotate;
                 ret->op2.value = ROR(imm_op->val, (imm_op->rotate << 1));
             }
+            
+            return ret;
         }
         
         if (instr_data->branch.c0 == 5) { // Branch
             ret->lookup_index = instr_data->branch.L ? BL : B;
             ret->type = InstrType_Branch;
             ret->offset = ((instr_data->branch.off ^ (1<<23)) - (1<<23)) << 2;
+            
+            return ret;
         }
         
         if (instr_data->mult.c0 == 9 && instr_data->mult.c1 == 0) { // Multiply
@@ -80,6 +84,8 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(int thumb, WORD instr) {
             } else {
                 ret->lookup_index = (instr_data->mult.U) ? SMULL : UMULL;
             }
+            
+            return ret;
         }
         
         if (instr_data->data_trns.c0 == 1) { // Single Data Transfer
@@ -168,8 +174,8 @@ char *_op2_to_string(ARMISA_InstrInfo *info) {
     return op2;
 }
 
-char *ARMISA_disasm(int thumb, WORD instr) {
-    ARMISA_InstrInfo *info = ARMISA_getInstrInfo(thumb, instr);
+char *ARMISA_disasm(ARM *cpu, WORD instr) {
+    ARMISA_InstrInfo *info = ARMISA_getInstrInfo(cpu, instr);
     char *mnemonic = mnemonic_lookup[info->lookup_index];
     char *ret = malloc(64); memset((void *)ret, 0, 64);
     char *op2 = _op2_to_string(info);
@@ -181,11 +187,6 @@ char *ARMISA_disasm(int thumb, WORD instr) {
 
     if (info->S) suffix[0] = 83;	// "S"
 
-    /*if (info->lookup_index == MLA) {
-        sprintf(ret, "MLA%s r%d, r%d, r%d, r%d", &cond, info->Rd, info->Rm, info->Rs, info->Rn);
-        return ret;
-    }*/
-
     switch (info->lookup_index) {
         case MOV: case MVN:
             sprintf(ret, "%s%s%s r%d, %s", mnemonic, &cond, suffix, info->Rd, op2); break;
@@ -196,7 +197,7 @@ char *ARMISA_disasm(int thumb, WORD instr) {
         case TST: case TEQ: case CMP: case CMN:
             sprintf(ret, "%s%s%s r%d, %s", mnemonic, &cond, suffix, info->Rn, &op2); break;
         case B: case BL:
-            sprintf(ret, "%s%s r15 + (%d)", mnemonic, &cond, info->offset); break;
+            sprintf(ret, "%s%s 0x%x", mnemonic, &cond, cpu->r[15] + info->offset); break;
         case MUL:
             sprintf(ret, "MUL%s%s r%d, r%d, r%d", &cond, suffix, info->Rd, info->Rm, info->Rs); break;
         case MLA:
