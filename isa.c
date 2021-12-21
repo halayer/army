@@ -48,11 +48,10 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
                     ret->Rs = ret->op2.shift_src = reg_op->shift.reg.Rs;
                 }
             } else {	// Immediate value
-                ret->op2.type = OperandType_Immediate;				// An immediate value is
-                ret->op2.shift_type = ShiftType_Rotate_Right;		// always rotated right by
-                ret->op2.shift_src_type = ShiftSrcType_Immediate;	// an immediate value
-                ret->op2.shift_src = imm_op->rotate;
-                ret->op2.value = ROR(imm_op->val, (imm_op->rotate << 1));
+                ret->op2.type = OperandType_Immediate;
+                /*ret->op2.shift_type = ShiftType_Rotate_Right;
+                ret->op2.shift_src_type = ShiftSrcType_Immediate;*/
+                ret->op2.value = ROR(imm_op->val, (imm_op->rotate << 1));   // An immediate value is always rotated right by another immediate value
             }
             
             return ret;
