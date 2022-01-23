@@ -124,6 +124,15 @@ int ARMISA_B(ARM *cpu, ARMISA_InstrInfo *info) {
     ARM_flushPipeline(cpu);
 }
 
+int ARMISA_BX(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[15] = cpu->r[info->Rn];
+    ARM_setFlag(cpu, FLAG_T, cpu->r[15] & 1);
+    
+    ARM_flushPipeline(cpu);
+}
+
 int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
     cpu->instr_cycles = 3;
     
@@ -131,6 +140,18 @@ int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
     cpu->r[15] += info->offset;
     
     ARM_flushPipeline(cpu);
+}
+
+int ARMISA_BLX(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    if (info->instr >> 25 == 125 && cpu->arch == ARCH_ARM9) {
+        return 0;
+    } else {
+        cpu->r[14] = cpu->r[15] - ((cpu->cpsr & FLAG_T) ? 2 : 4);
+        cpu->r[15] = cpu->r[info->Rn];
+        ARM_setFlag(cpu, FLAG_T, cpu->r[15] & 1);
+    }
 }
 
 // Multiply
