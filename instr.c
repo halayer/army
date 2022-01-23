@@ -117,7 +117,7 @@ int ARMISA_CMN(ARM *cpu, ARMISA_InstrInfo *info) {
 
 // Branch
 int ARMISA_B(ARM *cpu, ARMISA_InstrInfo *info) {
-    cpu->instr_cycles = 1;
+    cpu->instr_cycles = 3;
     
     cpu->r[15] += info->offset;
     
@@ -125,7 +125,7 @@ int ARMISA_B(ARM *cpu, ARMISA_InstrInfo *info) {
 }
 
 int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
-    cpu->instr_cycles = 1;
+    cpu->instr_cycles = 3;
     
     cpu->r[14] = cpu->r[15] - ((cpu->cpsr & FLAG_T) ? 2 : 4);
     cpu->r[15] += info->offset;
