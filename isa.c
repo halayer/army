@@ -25,6 +25,28 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
 
     if (!(cpu->cpsr & FLAG_T)) {
         // Identify instruction type
+        if (instr_data->mult.c0 == 9 && instr_data->mult.c1 == 0) { // Multiply
+            ret->type = InstrType_Multiply;
+            ret->Rm = instr_data->mult.Rm;
+            ret->Rs = instr_data->mult.Rs;
+            ret->Rn = instr_data->mult.Rn;
+            ret->Rd = instr_data->mult.Rd;
+            ret->S = instr_data->mult.S;
+            
+            if (!instr_data->mult.L) {
+                ret->lookup_index = (instr_data->mult.A) ? MLA : MUL;
+                return ret;
+            }
+            
+            if (instr_data->mult.A) {
+                ret->lookup_index = (instr_data->mult.U) ? SMLAL : UMLAL;
+            } else {
+                ret->lookup_index = (instr_data->mult.U) ? SMULL : UMULL;
+            }
+            
+            return ret;
+        }
+        
         if (instr_data->data_proc.c0 == 0) {	// Data processing instruction
             // Data processing instruction
             ret->lookup_index = instr_data->data_proc.op;
@@ -61,28 +83,6 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
             ret->lookup_index = instr_data->branch.L ? BL : B;
             ret->type = InstrType_Branch;
             ret->offset = ((instr_data->branch.off ^ (1<<23)) - (1<<23)) << 2;
-            
-            return ret;
-        }
-        
-        if (instr_data->mult.c0 == 9 && instr_data->mult.c1 == 0) { // Multiply
-            ret->type = InstrType_Multiply;
-            ret->Rm = instr_data->mult.Rm;
-            ret->Rs = instr_data->mult.Rs;
-            ret->Rn = instr_data->mult.Rn;
-            ret->Rd = instr_data->mult.Rd;
-            ret->S = instr_data->mult.S;
-            
-            if (!instr_data->mult.L) {
-                ret->lookup_index = (instr_data->mult.A) ? MLA : MUL;
-                return ret;
-            }
-            
-            if (instr_data->mult.A) {
-                ret->lookup_index = (instr_data->mult.U) ? SMLAL : UMLAL;
-            } else {
-                ret->lookup_index = (instr_data->mult.U) ? SMULL : UMULL;
-            }
             
             return ret;
         }
