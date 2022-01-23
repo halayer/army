@@ -24,8 +24,7 @@ enum ARMISA_Cond {
     LT = 11,
     GT = 12,
     LE = 13,
-    AL = 14,
-    NV = 15
+    AL = 14
 };
 char *ARMISA_cond2string(enum ARMISA_Cond cond);
 
@@ -214,6 +213,7 @@ typedef struct ARMISA_InstrInfo {
     int32_t offset;				// PC-relative offset (see ARMISA_Branch)
     ARMISA_OperandInfo op2;
     int lookup_index;
+    WORD instr;                 // The acutal instruction itself
 } ARMISA_InstrInfo;
 
 typedef int (*cycleFunc)(ARM *cpu, ARMISA_InstrInfo *info);
