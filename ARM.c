@@ -24,8 +24,7 @@ ARM *ARM_new(int arch) {
 
 int ARM_checkCondition(ARM *cpu, int cond) {
 	switch (cond) {
-		case AL: return 1;
-		case NV: return 0;
+		case AL: case 15: return 1;
 		case EQ: return ARM_getFlag(cpu, FLAG_Z);
 		case NE: return !ARM_getFlag(cpu, FLAG_Z);
 		case CS: return ARM_getFlag(cpu, FLAG_C);
@@ -42,12 +41,11 @@ int ARM_checkCondition(ARM *cpu, int cond) {
 			ARM_getFlag(cpu, FLAG_V)));
 		case LE: return (ARM_getFlag(cpu, FLAG_Z) || (ARM_getFlag(cpu, FLAG_N) != \
 			ARM_getFlag(cpu, FLAG_V)));
-		default: break;
 	}
 }
 
 int ARM_cycle(ARM *cpu) {
-	cycleFunc f = ARMISA_getInstrFunc(cpu->cpsr & FLAG_T, cpu->instr);
+	cycleFunc f = ARMISA_getInstrFunc(cpu, cpu->instr);
 	
 	if (cpu->pipeline.flushed) {
 		switch (cpu->current_cycle) {
@@ -64,12 +62,12 @@ int ARM_cycle(ARM *cpu) {
 				if (cpu->current_cycle == cpu->pipeline.size - 1) {
 					if (cpu->debug)
 						fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
-							ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+							ARMISA_disasm(cpu, cpu->instr));
 					
 					if (!ARM_checkCondition(cpu, cpu->instr >> 28))
 						goto instr_complete;
 					
-					f(cpu, ARMISA_getInstrInfo(cpu->cpsr & FLAG_T, cpu->instr));	// Execute instruction
+					f(cpu, ARMISA_getInstrInfo(cpu, cpu->instr));	// Execute instruction
 					cpu->pipeline.flushed = 0;
 					goto instr_complete;
 				}
@@ -80,12 +78,12 @@ int ARM_cycle(ARM *cpu) {
 				return 0;
 			
 			if (cpu->debug) fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
-				ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+				ARMISA_disasm(cpu, cpu->instr));
 			
 			if (!ARM_checkCondition(cpu, cpu->instr >> 28))
 				goto instr_complete;
 			
-			f(cpu, ARMISA_getInstrInfo(cpu->cpsr & FLAG_T, cpu->instr));	// Execute instruction
+			f(cpu, ARMISA_getInstrInfo(cpu, cpu->instr));	// Execute instruction
 		}
 		
 		if (cpu->current_cycle == cpu->instr_cycles - 1) {
@@ -204,7 +202,7 @@ void ARM_registerDump(ARM *cpu) {
 			break;
 	}
 	
-	fprintf(cpu->debug, "r15: 0x%.8x (%s)\n", cpu->r[15], ARMISA_disasm(cpu->cpsr & FLAG_T, cpu->instr));
+	fprintf(cpu->debug, "r15: 0x%.8x (%s)\n", cpu->r[15], ARMISA_disasm(cpu, cpu->instr));
 	fprintf(cpu->debug, "CPSR: %s %s %s %s %s %s %s\n", (ARM_getFlag(cpu, FLAG_T)) ? "T" : "t",
 		(ARM_getFlag(cpu, FLAG_F)) ? "F" : "f",
 		(ARM_getFlag(cpu, FLAG_I)) ? "I" : "i",
