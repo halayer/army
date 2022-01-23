@@ -20,7 +20,7 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
     ARMISA_ImmOperand *imm_op = (ARMISA_ImmOperand *)&instr;
     ARMISA_RegOperand *reg_op = (ARMISA_RegOperand *)&instr;
     ARMISA_InstrInfo *ret = malloc(sizeof(ARMISA_InstrInfo));
-    memset((void *)ret, 0, sizeof(ARMISA_InstrInfo));
+    memset((void *)ret, 0, sizeof(ARMISA_InstrInfo)); ret->instr = instr;
     strcpy((char *)&ret->cond, ARMISA_cond2string(instr_data->data_proc.cond));
 
     if (!(cpu->cpsr & FLAG_T)) {
@@ -80,9 +80,20 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
         }
         
         if (instr_data->branch.c0 == 5) { // Branch
-            ret->lookup_index = instr_data->branch.L ? BL : B;
+            if (instr_data->branch.cond == 15 && cpu->arch == ARCH_ARM9) {
+                ret->lookup_index = BLX;
+            } else if ((instr >> 8) & 0xFFFFF == 0x12FFF) {
+                switch ((instr >> 4) & 15) {
+                    case 1: ret->lookup_index = BX; break;
+                    //case 2: ret->lookup_index = BJX; break;       To be implemented among Jazelle bytecode execution
+                    case 3: ret->lookup_index = BLX; break;
+                }
+            } else {
+                ret->lookup_index = instr_data->branch.L ? BL : B;
+            }
+            
             ret->type = InstrType_Branch;
-            ret->offset = ((instr_data->branch.off ^ (1<<23)) - (1<<23)) << 2;
+            ret->offset = ((instr_data->branch.off ^ (1<<23)) - (1<<23)) << 2; // Converting to signed integer, then multiplying by 4
             
             return ret;
         }
