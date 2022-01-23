@@ -29,18 +29,11 @@ int main() {
     ram.mem = malloc(512);
     memset(ram.mem, 0, 512);
 
-    /* MOV r0, #8
+    /* MOV r0, #3
     MOV r1, #5
-    MOV r2, #0
-
-    loop:
-    SUBS r0, r0, r1
-    ADD r2, r2, #1
-
-    BPL loop
-    SUB r2, r2, #1*/
-    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\x08\x00\xa0\xe3\x05\x10\xa0\xe3\x00\x20\xa0\xe3\x01\x00\x50\xe0\x01\x20\x82\xe2\xfc\xff\xff\x5a\x01\x20\x42\xe2"));
-
+    MUL r2, r1, r0*/
+    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\x03\x00\xa0\xe3\x05\x10\xa0\xe3\x91\x00\x02\xe0"));
+    
     Bus_registerComponent(bus, &ram_comp);
 
     ARM_reset(cpu);
