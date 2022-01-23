@@ -29,11 +29,11 @@ int main() {
     ram.mem = malloc(512);
     memset(ram.mem, 0, 512);
 
-    /* MOV r0, #3
-    MOV r1, #5
-    MUL r2, r1, r0
-    AND r0, r2, r1, LSL r0*/
-    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\x03\x00\xa0\xe3\x05\x10\xa0\xe3\x91\x00\x02\xe0\x11\x00\x02\xe0"));
+    /* B label
+
+    label:
+    MOV r0, #1*/
+    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\xff\xff\xff\xea\x01\x00\xa0\xe3"));
     
     Bus_registerComponent(bus, &ram_comp);
 
