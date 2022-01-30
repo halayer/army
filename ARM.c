@@ -100,7 +100,6 @@ int ARM_cycle(ARM *cpu) {
     
     instr_complete:
     cpu->instr = cpu->next_instr;
-    //cpu->r[15] = cpu->next_instr_addr;
     cpu->current_cycle = 0;
     cpu->total_cycle++;
     
@@ -220,7 +219,6 @@ int ARM_prefetch(ARM *cpu) {
     }
     
     cpu->next_instr = Bus_read32(cpu->bus, cpu->r[15], NULL);
-    cpu->next_instr_addr = cpu->r[15];
     
     cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;
     
@@ -234,7 +232,6 @@ int ARM_fetch(ARM *cpu) {
     }
     
     cpu->instr = Bus_read32(cpu->bus, cpu->r[15], NULL);
-    cpu->next_instr_addr = cpu->r[15];
     
     cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;
     
@@ -262,7 +259,7 @@ void ARM_reset(ARM *cpu) {
     cpu->cpsr &= ~FLAG_T;										// Switch into ARM state
     cpu->cpsr |= FLAG_I;										// Disable IRQs
     cpu->cpsr |= FLAG_F;										// Disable FIQs
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x00;	// Jump to the interrupt vector
+    cpu->r[15] = cpu->vec_base + 0x00;	// Jump to the interrupt vector
     ARM_flushPipeline(cpu);
 }
 
@@ -272,7 +269,7 @@ void ARM_undefined(ARM *cpu, char *why) {
     ARM_switchMode(cpu, MODE_UNDEFINED);	// Switch into undefined mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x04;
+    cpu->r[15] = cpu->vec_base + 0x04;
     ARM_flushPipeline(cpu);
 }
 
@@ -281,7 +278,7 @@ void ARM_SWI(ARM *cpu) {
     ARM_switchMode(cpu, MODE_SUPERVISOR);	// Switch into supervisor mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x08;
+    cpu->r[15] = cpu->vec_base + 0x08;
     ARM_flushPipeline(cpu);
 }
 
@@ -291,7 +288,7 @@ void ARM_prefAbort(ARM *cpu, char *why) {
     ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x0C;
+    cpu->r[15] = cpu->vec_base + 0x0C;
     ARM_flushPipeline(cpu);
 }
 
@@ -301,7 +298,7 @@ void ARM_dataAbort(ARM *cpu, char *why) {
     ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x10;
+    cpu->r[15] = cpu->vec_base + 0x10;
     ARM_flushPipeline(cpu);
 }
 
@@ -310,7 +307,7 @@ void ARM_IRQ(ARM *cpu) {
     ARM_switchMode(cpu, MODE_IRQ);	// Switch into IRQ mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x18;
+    cpu->r[15] = cpu->vec_base + 0x18;
     ARM_flushPipeline(cpu);
 }
 
@@ -320,6 +317,6 @@ void ARM_FIQ(ARM *cpu) {
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
     cpu->cpsr |= FLAG_F;
-    cpu->next_instr_addr = cpu->r[15] = cpu->vec_base + 0x1C;
+    cpu->r[15] = cpu->vec_base + 0x1C;
     ARM_flushPipeline(cpu);
 }
