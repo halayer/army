@@ -29,15 +29,19 @@ int main() {
     ram.mem = malloc(512);
     memset(ram.mem, 0, 512);
 
-    /* B label
+    /* MOV r1, #1
+    BL label
+    MOV r1, #1
 
     label:
-    MOV r0, #1*/
-    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\xff\xff\xff\xea\x01\x00\xa0\xe3"));
+    MOV r0, #1
+    MOV pc, lr */
+    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\x01\x10\xa0\xe3\x00\x00\x00\xeb\x01\x10\xa0\xe3\x01\x00\xa0\xe3\x0e\xf0\xa0\xe1"));
     
     Bus_registerComponent(bus, &ram_comp);
 
     ARM_reset(cpu);
+    ARM_switchMode(cpu, MODE_USER);
     
     char c;
     int running = 1;
@@ -48,6 +52,8 @@ int main() {
     } while (getchar() != 104);
 
     ARM_registerDump(cpu);
+    if (ARM_getMode(cpu) == MODE_USER) { printf("USR\n"); }
+    else if (ARM_getMode(cpu) == MODE_SUPERVISOR) { printf("SVC\n"); }
 
     return 0;
 }
