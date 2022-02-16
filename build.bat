@@ -1,5 +1,5 @@
 @echo off
 
-gcc main.c ARM.c bus.c isa.c instr.c -Iinclude -o main.exe
+gcc -g main.c ARM.c cbs/bus.c isa.c instr.c -Iinclude -o main.exe
 
 exit /B
