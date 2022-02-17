@@ -48,7 +48,11 @@
     
 // Data processing
 int ARMISA_MOV(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (info->Rd == 15 && info->op2.value == 14) {
+        printf("%d\n", cpu->r[14]);
+    }
     DP_LOGICAL(cpu->r[Rd] = Op2)
+    if (info->Rd == 15) { ARM_flushPipeline(cpu); }
 }
 
 int ARMISA_MVN(ARM *cpu, ARMISA_InstrInfo *info) {
@@ -124,20 +128,19 @@ int ARMISA_B(ARM *cpu, ARMISA_InstrInfo *info) {
     ARM_flushPipeline(cpu);
 }
 
-int ARMISA_BX(ARM *cpu, ARMISA_InstrInfo *info) {
-    cpu->instr_cycles = 3;
-    
-    cpu->r[15] = cpu->r[info->Rn];
-    ARM_setFlag(cpu, FLAG_T, cpu->r[15] & 1);
-    
-    ARM_flushPipeline(cpu);
-}
-
 int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
     cpu->instr_cycles = 3;
     
     cpu->r[14] = cpu->r[15] - ((cpu->cpsr & FLAG_T) ? 2 : 4);
     cpu->r[15] += info->offset;
+    ARM_flushPipeline(cpu);
+}
+
+int ARMISA_BX(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[15] = cpu->r[info->Rn];
+    ARM_setFlag(cpu, FLAG_T, cpu->r[15] & 1);
     
     ARM_flushPipeline(cpu);
 }
@@ -273,13 +276,13 @@ int ARMISA_LDR(ARM *cpu, ARMISA_InstrInfo *info) {
     }
     
     if (info->P) {  // Pre-indexed
-        if (info->B) { cpu->r[info->Rd] = Bus_read32(cpu->bus, Op2, NULL); }
-        else { cpu->r[info->Rd] = Bus_read8(cpu->bus, Op2, NULL); }
+        if (info->B) { Bus_read(cpu->bus, Op2, 4, &cpu->r[info->Rd]); }
+        else { Bus_read(cpu->bus, Op2, 1, &cpu->r[info->Rd]); }
         
         if (info->W) { cpu->r[info->Rn] = Op2; }
     } else {    // Post-indexed
-        if (info->B) { Bus_read32(cpu->bus, cpu->r[info->Rn], NULL); }
-        else { Bus_read8(cpu->bus, cpu->r[info->Rn], NULL); }
+        if (info->B) { Bus_read(cpu->bus, cpu->r[info->Rn], 4, &cpu->r[info->Rd]); }
+        else { Bus_read(cpu->bus, cpu->r[info->Rn], 1, &cpu->r[info->Rd]); }
         cpu->r[info->Rn] = Op2;
     }
 }
@@ -297,13 +300,13 @@ int ARMISA_STR(ARM *cpu, ARMISA_InstrInfo *info) {
     }
 
     if (info->P) {  // Pre-indexed
-        if (!info->B) { Bus_write32(cpu->bus, Op2, cpu->r[info->Rd]); }
-        else { Bus_write8(cpu->bus, Op2, cpu->r[info->Rd]); }
+        if (!info->B) { Bus_write(cpu->bus, Op2, 4, &cpu->r[info->Rd]); }
+        else { Bus_write(cpu->bus, Op2, 1, &cpu->r[info->Rd]); }
         
         if (info->W) { cpu->r[info->Rn] = Op2; }
     } else {    // Post-indexed
-        if (!info->B) { Bus_write32(cpu->bus, cpu->r[info->Rn], cpu->r[info->Rd]); }
-        else { Bus_write8(cpu->bus, cpu->r[info->Rn], cpu->r[info->Rd]); }
+        if (!info->B) { Bus_write(cpu->bus, cpu->r[info->Rn], 4, &cpu->r[info->Rd]); }
+        else { Bus_write(cpu->bus, cpu->r[info->Rn], 1, &cpu->r[info->Rd]); }
         
         cpu->r[info->Rn] = Op2;
     }
