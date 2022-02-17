@@ -81,12 +81,12 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
         
         if (instr_data->branch.c0 == 5) { // Branch
             if (instr_data->branch.cond == 15 && cpu->arch == ARCH_ARM9) {
-                ret->lookup_index = BLX;
+                ret->lookup_index = BLX_imm;
             } else if ((instr >> 8) & 0xFFFFF == 0x12FFF) {
                 switch ((instr >> 4) & 15) {
                     case 1: ret->lookup_index = BX; break;
                     //case 2: ret->lookup_index = BJX; break;       To be implemented among Jazelle bytecode execution
-                    case 3: ret->lookup_index = BLX; break;
+                    case 3: ret->lookup_index = BLX_reg; break;
                 }
             } else {
                 ret->lookup_index = instr_data->branch.L ? BL : B;
@@ -184,7 +184,7 @@ char *_op2_to_string(ARMISA_InstrInfo *info) {
     return op2;
 }
 
-char *ARMISA_disasm(ARM *cpu, WORD instr) {
+char *ARMISA_disasm(ARM *cpu, WORD instr, int pc_offset) {
     ARMISA_InstrInfo *info = ARMISA_getInstrInfo(cpu, instr);
     char *mnemonic = mnemonic_lookup[info->lookup_index];
     char *ret = malloc(64); memset((void *)ret, 0, 64);
@@ -206,8 +206,10 @@ char *ARMISA_disasm(ARM *cpu, WORD instr) {
             break;
         case TST: case TEQ: case CMP: case CMN:
             sprintf(ret, "%s%s%s r%d, %s", mnemonic, &cond, suffix, info->Rn, &op2); break;
-        case B: case BL:
-            sprintf(ret, "%s%s 0x%x", mnemonic, &cond, cpu->r[15] + info->offset); break;
+        case B: case BL: case BX:
+            sprintf(ret, "%s%s 0x%x", mnemonic, &cond, cpu->r[15] + info->offset + pc_offset); break;
+        case BLX_imm:
+            sprintf(ret, "%s 0x%x", mnemonic, cpu->r[15] + info->offset + pc_offset); break;
         case MUL:
             sprintf(ret, "MUL%s%s r%d, r%d, r%d", &cond, suffix, info->Rd, info->Rm, info->Rs); break;
         case MLA:
