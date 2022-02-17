@@ -25,13 +25,13 @@ int RAM_write(void *inst, uint64_t addr, int size, void *src) {
 
 int main() {
     Bus bus = {0};
-    ARM *cpu = ARM_new(ARCH_ARM9);
+    ARM *cpu = ARM_new(ARCH_ARM7);
     RAM ram; ram.bus = &bus;
     Component ram_comp = {1, RAM_checkAddrSpace, RAM_read, RAM_write};
     ram_comp.inst = &ram;
 
     cpu->debug = stdout;
-    //bus->debug = stdout;
+    //bus.debug = stdout;
     cpu->bus = &bus;
 
     ram.mem = (WORD *)malloc(512);
