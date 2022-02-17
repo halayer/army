@@ -220,6 +220,6 @@ typedef int (*cycleFunc)(ARM *cpu, ARMISA_InstrInfo *info);
 
 cycleFunc ARMISA_getInstrFunc(ARM *cpu, WORD instr);
 ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr);
-char *ARMISA_disasm(ARM *cpu, WORD instr);
+char *ARMISA_disasm(ARM *cpu, WORD instr, int pc_offset);
 
 #endif
