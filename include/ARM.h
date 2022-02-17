@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "types.h"
-#include "bus.h"
+#include "cbs/bus.h"
 
 // Status Register
 #define FLAG_N (1 << 31)	// Negative ALU result
@@ -56,7 +56,6 @@ typedef struct ARM {
 	int instr_cycles;		// Amount of clock cycles the current instruction takes
 	int current_cycle;		// Current instruction clock cycle
 	int total_cycle;		// Total clock cycle
-	WORD next_instr_addr;	// Address of the next instruction
 	WORD next_instr;		// Next instruction
 } ARM;
 
