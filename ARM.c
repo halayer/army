@@ -64,7 +64,7 @@ int ARM_cycle(ARM *cpu) {
                     
                     if (cpu->debug)
                         fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
-                            ARMISA_disasm(cpu, cpu->instr));
+                            ARMISA_disasm(cpu, cpu->instr, 0));
                     
                     if (!ARM_checkCondition(cpu, cpu->instr >> 28))
                         goto instr_complete;
@@ -79,7 +79,7 @@ int ARM_cycle(ARM *cpu) {
                 return 0;
             
             if (cpu->debug) fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
-                ARMISA_disasm(cpu, cpu->instr));
+                ARMISA_disasm(cpu, cpu->instr, 0));
             
             if (!ARM_checkCondition(cpu, cpu->instr >> 28))
                 goto instr_complete;
@@ -203,7 +203,7 @@ void ARM_registerDump(ARM *cpu) {
             break;
     }
     
-    fprintf(cpu->debug, "r15: 0x%.8x (%s)\n", cpu->r[15], ARMISA_disasm(cpu, cpu->instr));
+    fprintf(cpu->debug, "r15: 0x%.8x (%s)\n", cpu->r[15], ARMISA_disasm(cpu, cpu->instr, 8));
     fprintf(cpu->debug, "CPSR: %s %s %s %s %s %s %s\n", (ARM_getFlag(cpu, FLAG_T)) ? "T" : "t",
         (ARM_getFlag(cpu, FLAG_F)) ? "F" : "f",
         (ARM_getFlag(cpu, FLAG_I)) ? "I" : "i",
@@ -214,7 +214,7 @@ void ARM_registerDump(ARM *cpu) {
 }
 
 int ARM_prefetch(ARM *cpu) {
-    if (cpu->r[15] & 3) {
+    if (cpu->r[15] & 3 && !ARM_getFlag(cpu, FLAG_T)) {
         ARM_prefAbort(cpu, "fetching from an unaligned address.");
         return -1;
     }
