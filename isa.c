@@ -11,6 +11,7 @@ char *ARMISA_cond2string(enum ARMISA_Cond cond) {
 
 cycleFunc ARMISA_getInstrFunc(ARM *cpu, WORD instr) {
     ARMISA_InstrInfo *info = ARMISA_getInstrInfo(cpu, instr);
+    if (!info) return NULL;
 
     return instr_func_lookup[info->lookup_index];
 }
@@ -80,7 +81,9 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
         }
         
         if (instr_data->branch.c0 == 5) { // Branch
-            if (instr_data->branch.cond == 15 && cpu->arch == ARCH_ARM9) {
+            if (instr_data->branch.cond == 15) {
+                if (cpu->arch != ARCH_ARM9) goto unknown;
+                
                 ret->lookup_index = BLX_imm;
             } else if ((instr >> 8) & 0xFFFFF == 0x12FFF) {
                 switch ((instr >> 4) & 15) {
@@ -121,10 +124,14 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
                 ret->op2.type = OperandType_Immediate;
                 ret->op2.value = instr & 0xFFF;
             }
+            
+            return ret;
         }
     }
 
-    return ret;
+    unknown:
+    free(ret);
+    return NULL;
 }
 
 char *shift_type_lookup[4] = {"LSL", "LSR", "ASR", "ROR"};
@@ -186,6 +193,7 @@ char *_op2_to_string(ARMISA_InstrInfo *info) {
 
 char *ARMISA_disasm(ARM *cpu, WORD instr, int pc_offset) {
     ARMISA_InstrInfo *info = ARMISA_getInstrInfo(cpu, instr);
+    if (!info) return NULL;
     char *mnemonic = mnemonic_lookup[info->lookup_index];
     char *ret = malloc(64); memset((void *)ret, 0, 64);
     char *op2 = _op2_to_string(info);
