@@ -69,6 +69,11 @@ int ARM_cycle(ARM *cpu) {
                     if (!ARM_checkCondition(cpu, cpu->instr >> 28))
                         goto instr_complete;
                     
+                    if (!f) {
+                        ARM_undefined(cpu, "unknown instruction");
+                        return -1;
+                    }
+                    
                     f(cpu, ARMISA_getInstrInfo(cpu, cpu->instr));	// Execute instruction
                     goto instr_complete;
                 }
@@ -83,6 +88,11 @@ int ARM_cycle(ARM *cpu) {
             
             if (!ARM_checkCondition(cpu, cpu->instr >> 28))
                 goto instr_complete;
+            
+            if (!f) {
+                ARM_undefined(cpu, "unknown instruction");
+                return -1;
+            }
             
             f(cpu, ARMISA_getInstrInfo(cpu, cpu->instr));	// Execute instruction
             goto instr_complete;
@@ -113,7 +123,7 @@ int ARM_step(ARM *cpu) {
     while (1) {
         ret = ARM_cycle(cpu);
         
-        if (ret > 0)
+        if (ret != 0)
             return ret;
     }
 }
