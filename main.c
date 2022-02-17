@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "ARM.h"
-#include "bus.h"
+#include "cbs/bus.h"
 #include "isa.h"
 
 typedef struct RAM {
@@ -10,42 +11,42 @@ typedef struct RAM {
     WORD *mem;
 } RAM;
 
-int RAM_checkAddrSpace(void *inst, WORD addr) { return 1; }
-WORD RAM_readWord(void *inst, WORD addr) { return ((RAM *)inst)->mem[addr >> 2]; }
-int RAM_writeWord(void *inst, WORD addr, WORD data) { ((RAM *)inst)->mem[addr >> 2] = data; }
-int RAM_readArea(void *inst, WORD addr, int size, void *dst) { memcpy(dst, (void *)((RAM *)inst)->mem, size*4); }
-int RAM_writeArea(void *inst, WORD addr, int size, void *src) { memcpy((void *)((RAM *)inst)->mem, src, size*4); }
+int RAM_checkAddrSpace(void *inst, uint64_t addr) { return 1; }
+int RAM_read(void *inst, uint64_t addr, int size, void *dst) {
+    RAM *r = (RAM *)inst;
+    memcpy(dst, (void *)(r->mem) + addr, size);
+    return 0;
+}
+int RAM_write(void *inst, uint64_t addr, int size, void *src) {
+    RAM *r = (RAM *)inst;
+    memcpy((void *)(r->mem) + addr, src, size);
+    return 0;
+}
 
 int main() {
-    Bus *bus = Bus_new();
+    Bus bus = {0};
     ARM *cpu = ARM_new(ARCH_ARM9);
-    RAM ram; ram.bus = bus;
-    Component ram_comp = {1, RAM_checkAddrSpace, RAM_readWord, RAM_writeWord, RAM_readArea, RAM_writeArea};
+    RAM ram; ram.bus = &bus;
+    Component ram_comp = {1, RAM_checkAddrSpace, RAM_read, RAM_write};
     ram_comp.inst = &ram;
 
     cpu->debug = stdout;
-    cpu->bus = bus;
+    //bus->debug = stdout;
+    cpu->bus = &bus;
 
-    ram.mem = malloc(512);
-    memset(ram.mem, 0, 512);
+    ram.mem = (WORD *)malloc(512);
+    memset((void *)ram.mem, 0, 512);
 
-    /* MOV r1, #1
-    BL label
-    MOV r1, #1
-
-    label:
-    MOV r0, #1
-    MOV pc, lr */
-    RAM_writeArea((void *)&ram, 0, 7, (void *)((WORD *)"\x01\x10\xa0\xe3\x00\x00\x00\xeb\x01\x10\xa0\xe3\x01\x00\xa0\xe3\x0e\xf0\xa0\xe1"));
+    /* B 4
+    BL 8
+    BLX 0xc */
+    char prog[12] = "\xff\xff\xff\xea\xff\xff\xff\xeb\xff\xff\xff\xfa";
+    memcpy((void *)ram.mem, (void *)&prog, sizeof(prog));
     
-    Bus_registerComponent(bus, &ram_comp);
+    Bus_attachComponent(&bus, &ram_comp);
 
     ARM_reset(cpu);
     ARM_switchMode(cpu, MODE_USER);
-    
-    char c;
-    int running = 1;
-    WORD addr;
 
     do {
         ARM_step(cpu);
