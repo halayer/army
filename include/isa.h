@@ -175,7 +175,7 @@ typedef struct ARMISA_BlkTrns {
 } ARMISA_BlkTrns;
 
 typedef struct ARMISA_SWI {
-    WORD ingored:24;
+    WORD ignored:24;
     WORD c0:4;	// Constant: Must be 0b1111
     WORD cond:4;
 } ARMISA_SWI;
@@ -214,6 +214,7 @@ typedef struct ARMISA_InstrInfo {
     ARMISA_OperandInfo op2;
     int lookup_index;
     WORD instr;                 // The acutal instruction itself
+    WORD swi_num;               // SWI 'ignored' field
 } ARMISA_InstrInfo;
 
 typedef int (*cycleFunc)(ARM *cpu, ARMISA_InstrInfo *info);
