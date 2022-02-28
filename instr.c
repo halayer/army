@@ -22,7 +22,7 @@
     WORD Rn = info->Rn; \
     cpu->instr_cycles = 1; \
     if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
-    if (Rd == 15) cpu->instr_cycles += 2; \
+    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); } \
     if (info->op2.type == OperandType_Register) { \
         if (info->op2.shift_src_type == ShiftSrcType_Rs) \
             info->op2.shift_src = cpu->r[info->Rs]; \
@@ -38,8 +38,12 @@
     WORD Rn = info->Rn; \
     cpu->instr_cycles = 1; \
     if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
-    if (Rd == 15) cpu->instr_cycles += 2; \
-    if (info->op2.type == OperandType_Register) { Op2 = cpu->r[info->op2.value]; } \
+    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); } \
+    if (info->op2.type == OperandType_Register) { \
+        if (info->op2.shift_src_type == ShiftSrcType_Rs) \
+            info->op2.shift_src = cpu->r[info->Rs]; \
+        SHIFT \
+    } \
     uint64_t res = s; \
     if (info->S) { ARM_setFlag(cpu, FLAG_C, (res > 0xFFFFFFFF)); \
                    ARM_setFlag(cpu, FLAG_V, ((int64_t)res) < 0); } \
@@ -48,11 +52,7 @@
     
 // Data processing
 int ARMISA_MOV(ARM *cpu, ARMISA_InstrInfo *info) {
-    if (info->Rd == 15 && info->op2.value == 14) {
-        printf("%d\n", cpu->r[14]);
-    }
     DP_LOGICAL(cpu->r[Rd] = Op2)
-    if (info->Rd == 15) { ARM_flushPipeline(cpu); }
 }
 
 int ARMISA_MVN(ARM *cpu, ARMISA_InstrInfo *info) {
