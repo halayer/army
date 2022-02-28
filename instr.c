@@ -22,7 +22,8 @@
     WORD Rn = info->Rn; \
     cpu->instr_cycles = 1; \
     if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
-    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); } \
+    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); \
+        if (info->S) ARM_hndlrExit(cpu); } \
     if (info->op2.type == OperandType_Register) { \
         if (info->op2.shift_src_type == ShiftSrcType_Rs) \
             info->op2.shift_src = cpu->r[info->Rs]; \
@@ -30,25 +31,10 @@
     } \
     uint64_t res = s; \
     UPDATE_FLAGS;
-    //else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); };
 #define DP_ARITHMETIC(s) \
-    WORD Op2 = info->op2.value; \
-    if (info->op2.type == OperandType_Register) Op2 = cpu->r[Op2]; \
-    WORD Rd = info->Rd; \
-    WORD Rn = info->Rn; \
-    cpu->instr_cycles = 1; \
-    if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
-    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); } \
-    if (info->op2.type == OperandType_Register) { \
-        if (info->op2.shift_src_type == ShiftSrcType_Rs) \
-            info->op2.shift_src = cpu->r[info->Rs]; \
-        SHIFT \
-    } \
-    uint64_t res = s; \
+    DP_LOGICAL(s) \
     if (info->S) { ARM_setFlag(cpu, FLAG_C, (res > 0xFFFFFFFF)); \
                    ARM_setFlag(cpu, FLAG_V, ((int64_t)res) < 0); } \
-    UPDATE_FLAGS;
-    //else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); };
     
 // Data processing
 int ARMISA_MOV(ARM *cpu, ARMISA_InstrInfo *info) {
