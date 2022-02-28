@@ -127,6 +127,14 @@ ARMISA_InstrInfo *ARMISA_getInstrInfo(ARM *cpu, WORD instr) {
             
             return ret;
         }
+        
+        if (instr_data->swi.c0 == 15) {
+            ret->type = InstrType_SWI;
+            ret->lookup_index = SWI;
+            ret->swi_num = instr_data->swi.ignored;
+            
+            return ret;
+        }
     }
 
     unknown:
@@ -229,6 +237,8 @@ char *ARMISA_disasm(ARM *cpu, WORD instr, int pc_offset) {
         case LDR: case STR:
             sprintf(ret, "%s%s%s%s r%d, %s", mnemonic, (info->B) ? "B" : "", (info->W && !info->P) ? "T" : "", &cond,
                 info->Rd, op2); break;
+        case SWI:
+            sprintf(ret, "%s%s #0x%x", mnemonic, &cond, info->swi_num); break;
         default: break;
     }
 
