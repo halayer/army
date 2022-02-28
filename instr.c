@@ -1,334 +1,328 @@
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include "ARM.h"
-#include "cbs/bus.h"
 #include "isa.h"
 
-#define XCHG(a, b) do { int _tmp = a; a = b; b = _tmp; } while (0)
-    
-int dbg_cycle(ARM *cpu) {
-    fprintf(cpu->debug, "DBG CYCLE\n");
-    return 0;
-}
-
-ARM *ARM_new(int arch) {
-    ARM *cpu = (ARM *)malloc(sizeof(ARM));
-    memset((void *)cpu, 0, sizeof(ARM));
-    
-    cpu->arch = arch;
-    cpu->pipeline.size = (arch == ARCH_ARM7) ? 3 : 5;
-    
-    return cpu;
-}
-
-int ARM_checkCondition(ARM *cpu, int cond) {
-    switch (cond) {
-        case AL: case 15: return 1;
-        case EQ: return ARM_getFlag(cpu, FLAG_Z);
-        case NE: return !ARM_getFlag(cpu, FLAG_Z);
-        case CS: return ARM_getFlag(cpu, FLAG_C);
-        case CC: return !ARM_getFlag(cpu, FLAG_C);
-        case MI: return ARM_getFlag(cpu, FLAG_N);
-        case PL: return !ARM_getFlag(cpu, FLAG_N);
-        case VS: return ARM_getFlag(cpu, FLAG_V);
-        case VC: return !ARM_getFlag(cpu, FLAG_V);
-        case HI: return (ARM_getFlag(cpu, FLAG_C) && (!ARM_getFlag(cpu, FLAG_Z)));
-        case LS: return ((!ARM_getFlag(cpu, FLAG_C)) || ARM_getFlag(cpu, FLAG_Z));
-        case GE: return ARM_getFlag(cpu, FLAG_N) == ARM_getFlag(cpu, FLAG_V);
-        case LT: return ARM_getFlag(cpu, FLAG_N) != ARM_getFlag(cpu, FLAG_V);
-        case GT: return ((!ARM_getFlag(cpu, FLAG_Z)) && (ARM_getFlag(cpu, FLAG_N) == \
-            ARM_getFlag(cpu, FLAG_V)));
-        case LE: return (ARM_getFlag(cpu, FLAG_Z) || (ARM_getFlag(cpu, FLAG_N) != \
-            ARM_getFlag(cpu, FLAG_V)));
+// Instructions
+#define UPDATE_FLAGS \
+    if (info->S) { ARM_setFlag(cpu, FLAG_N, res & 0x80000000); \
+                   ARM_setFlag(cpu, FLAG_Z, res == 0); }
+#define SHIFT switch (info->op2.shift_type) { \
+        case ShiftType_Logical_Left: \
+            Op2 = LSL(Op2, info->op2.shift_src); break; \
+        case ShiftType_Logical_Right: \
+            Op2 = LSR(Op2, info->op2.shift_src); break; \
+        case ShiftType_Arithmetic_Right: \
+            Op2 = ASR(Op2, info->op2.shift_src); break; \
+        case ShiftType_Rotate_Right: \
+            Op2 = ROR(Op2, info->op2.shift_src); break; \
     }
+#define DP_LOGICAL(s) \
+    WORD Op2 = info->op2.value; \
+    if (info->op2.type == OperandType_Register) Op2 = cpu->r[Op2]; \
+    WORD Rd = info->Rd; \
+    WORD Rn = info->Rn; \
+    cpu->instr_cycles = 1; \
+    if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
+    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); } \
+    if (info->op2.type == OperandType_Register) { \
+        if (info->op2.shift_src_type == ShiftSrcType_Rs) \
+            info->op2.shift_src = cpu->r[info->Rs]; \
+        SHIFT \
+    } \
+    uint64_t res = s; \
+    UPDATE_FLAGS;
+    //else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); };
+#define DP_ARITHMETIC(s) \
+    WORD Op2 = info->op2.value; \
+    if (info->op2.type == OperandType_Register) Op2 = cpu->r[Op2]; \
+    WORD Rd = info->Rd; \
+    WORD Rn = info->Rn; \
+    cpu->instr_cycles = 1; \
+    if (info->op2.shift_src_type == ShiftSrcType_Rs) cpu->instr_cycles++; \
+    if (Rd == 15) { cpu->instr_cycles += 2; ARM_flushPipeline(cpu); } \
+    if (info->op2.type == OperandType_Register) { \
+        if (info->op2.shift_src_type == ShiftSrcType_Rs) \
+            info->op2.shift_src = cpu->r[info->Rs]; \
+        SHIFT \
+    } \
+    uint64_t res = s; \
+    if (info->S) { ARM_setFlag(cpu, FLAG_C, (res > 0xFFFFFFFF)); \
+                   ARM_setFlag(cpu, FLAG_V, ((int64_t)res) < 0); } \
+    UPDATE_FLAGS;
+    //else { Op2 = ROR(info->op2.value, (info->op2.shift_src << 1)); };
+    
+// Data processing
+int ARMISA_MOV(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_LOGICAL(cpu->r[Rd] = Op2)
 }
 
-int ARM_cycle(ARM *cpu) {
-    cycleFunc f = ARMISA_getInstrFunc(cpu, cpu->instr);
-    
-    if (cpu->pipeline.flushed) {
-        switch (cpu->current_cycle) {
-            case 0:	// FETCH CYCLE
-                if (ARM_fetch(cpu) != 0)	// Fetch current instruction
-                    return 0;
-                goto ret;
-            case 1:	// SECOND CYCLE
-                if (ARM_prefetch(cpu) != 0)	// Prefetching next instruction
-                    return 0;
-                goto ret;
-            default:
-                // Execute instruction on last cycle
-                if (cpu->current_cycle == cpu->pipeline.size - 1) {
-                    cpu->pipeline.flushed = 0;
-                    
-                    if (cpu->debug)
-                        fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
-                            ARMISA_disasm(cpu, cpu->instr, 0));
-                    
-                    if (!ARM_checkCondition(cpu, cpu->instr >> 28))
-                        goto instr_complete;
-                    
-                    if (!f) {
-                        ARM_undefined(cpu, "unknown instruction");
-                        return -1;
-                    }
-                    
-                    f(cpu, ARMISA_getInstrInfo(cpu, cpu->instr));	// Execute instruction
-                    goto instr_complete;
-                }
-        }
-    } else {
-        if (cpu->current_cycle == 0) {
-            if (ARM_prefetch(cpu) != 0)
-                return 0;
-            
-            if (cpu->debug) fprintf(cpu->debug, "[0x%.8x]: %s\n", cpu->r[15]-8, \
-                ARMISA_disasm(cpu, cpu->instr, 0));
-            
-            if (!ARM_checkCondition(cpu, cpu->instr >> 28))
-                goto instr_complete;
-            
-            if (!f) {
-                ARM_undefined(cpu, "unknown instruction");
-                return -1;
-            }
-            
-            f(cpu, ARMISA_getInstrInfo(cpu, cpu->instr));	// Execute instruction
-            goto instr_complete;
-        }
-        
-        if (cpu->current_cycle == cpu->instr_cycles - 1) {
-            goto instr_complete;
-        }
-    }
-    
-    ret:
-    cpu->current_cycle++;
-    cpu->total_cycle++;
-    
-    return 0;
-    
-    instr_complete:
-    cpu->instr = cpu->next_instr;
-    cpu->current_cycle = 0;
-    cpu->total_cycle++;
-    
-    return 1;
+int ARMISA_MVN(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_LOGICAL(cpu->r[Rd] = ~Op2)
 }
 
-int ARM_step(ARM *cpu) {
-    int ret;
-    
-    while (1) {
-        ret = ARM_cycle(cpu);
-        
-        if (ret != 0)
-            return ret;
-    }
+int ARMISA_ORR(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_LOGICAL(cpu->r[Rd] = cpu->r[Rn] | Op2)
 }
 
-void ARM_switchMode(ARM *cpu, int new_mode) {
-    int old_mode = cpu->cpsr & M;
-    if (old_mode == new_mode) return;
-    
-    if (new_mode == MODE_FIQ || ((new_mode == MODE_USER || new_mode == MODE_SYSTEM) && old_mode == MODE_FIQ)) {
-        XCHG(cpu->r[8], cpu->r8_fiq);
-        XCHG(cpu->r[9], cpu->r9_fiq);
-        XCHG(cpu->r[10], cpu->r10_fiq);
-        XCHG(cpu->r[11], cpu->r11_fiq);
-        XCHG(cpu->r[12], cpu->r12_fiq);
-        XCHG(cpu->r[13], cpu->r13_fiq);
-        XCHG(cpu->r[14], cpu->r14_fiq);
-        XCHG(cpu->cpsr, cpu->spsr_fiq);
-    } else if (new_mode == MODE_SUPERVISOR || ((new_mode == MODE_USER || new_mode == MODE_SYSTEM) && old_mode == MODE_SUPERVISOR)) {
-        XCHG(cpu->r[13], cpu->r13_svc);
-        XCHG(cpu->r[14], cpu->r14_svc);
-        XCHG(cpu->cpsr, cpu->spsr_svc);
-    } else if (new_mode == MODE_ABORT || ((new_mode == MODE_USER || new_mode == MODE_SYSTEM) && old_mode == MODE_ABORT)) {
-        XCHG(cpu->r[13], cpu->r13_abt);
-        XCHG(cpu->r[14], cpu->r14_abt);
-        XCHG(cpu->cpsr, cpu->spsr_abt);
-    } else if (new_mode == MODE_IRQ || ((new_mode == MODE_USER || new_mode == MODE_SYSTEM) && old_mode == MODE_IRQ)) {
-        XCHG(cpu->r[13], cpu->r13_irq);
-        XCHG(cpu->r[14], cpu->r14_irq);
-        XCHG(cpu->cpsr, cpu->spsr_irq);
-    } else if (new_mode == MODE_UNDEFINED || ((new_mode == MODE_USER || new_mode == MODE_SYSTEM) && old_mode == MODE_UNDEFINED)) {
-        XCHG(cpu->r[13], cpu->r13_und);
-        XCHG(cpu->r[14], cpu->r14_und);
-        XCHG(cpu->cpsr, cpu->spsr_und);
-    }
-    
-    cpu->cpsr &= ~M;
-    cpu->cpsr |= new_mode;
+int ARMISA_EOR(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_LOGICAL(cpu->r[Rd] = cpu->r[Rn] ^ Op2)
 }
 
-int ARM_getMode(ARM *cpu) {
-    return cpu->cpsr & M;
+int ARMISA_AND(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_LOGICAL(cpu->r[Rd] = cpu->r[Rn] & Op2)
 }
 
-void ARM_registerDump(ARM *cpu) {
-    for (int i = 0; i < 8; i++) {
-        fprintf(cpu->debug, "r%d:  0x%.8x\n", i, cpu->r[i]);
-    }
-    
-    if (ARM_getMode(cpu) == MODE_FIQ) {
-        fprintf(cpu->debug, "r8:  0x%.8x	r8_fiq:  0x%.8x\n", cpu->r8_fiq, cpu->r[8]);
-        fprintf(cpu->debug, "r9:  0x%.8x	r9_fiq:  0x%.8x\n", cpu->r9_fiq, cpu->r[9]);
-        fprintf(cpu->debug, "r10: 0x%.8x	r10_fiq: 0x%.8x\n", cpu->r10_fiq, cpu->r[10]);
-        fprintf(cpu->debug, "r11: 0x%.8x	r11_fiq: 0x%.8x\n", cpu->r11_fiq, cpu->r[11]);
-        fprintf(cpu->debug, "r12: 0x%.8x	r12_fiq: 0x%.8x\n", cpu->r12_fiq, cpu->r[12]);
-        fprintf(cpu->debug, "r13: 0x%.8x	r13_fiq: 0x%.8x	r13_svc: 0x%.8x	r13_abt: 0x%.8x	r13_irq: 0x%.8x	r13_und: 0x%.8x\n", cpu->r13_fiq, cpu->r[13], cpu->r13_svc, cpu->r13_abt, cpu->r13_irq, cpu->r13_und);
-        fprintf(cpu->debug, "r14: 0x%.8x	r14_fiq: 0x%.8x	r14_svc: 0x%.8x	r14_abt: 0x%.8x	r14_irq: 0x%.8x	r14_und: 0x%.8x\n", cpu->r14_fiq, cpu->r[14], cpu->r14_svc, cpu->r14_abt, cpu->r14_irq, cpu->r14_und);
-    } else {
-        fprintf(cpu->debug, "r8:  0x%.8x	r8_fiq:  0x%.8x\n", cpu->r[8], cpu->r8_fiq);
-        fprintf(cpu->debug, "r9:  0x%.8x	r9_fiq:  0x%.8x\n", cpu->r[9], cpu->r9_fiq);
-        fprintf(cpu->debug, "r10: 0x%.8x	r10_fiq: 0x%.8x\n", cpu->r[10], cpu->r10_fiq);
-        fprintf(cpu->debug, "r11: 0x%.8x	r11_fiq: 0x%.8x\n", cpu->r[11], cpu->r11_fiq);
-        fprintf(cpu->debug, "r12: 0x%.8x	r12_fiq: 0x%.8x\n", cpu->r[12], cpu->r12_fiq);
-    }
-    
-    switch (ARM_getMode(cpu)) {
-        case (MODE_USER):
-        case (MODE_SYSTEM):
-            fprintf(cpu->debug, "r13: 0x%.8x	r13_fiq: 0x%.8x	r13_svc: 0x%.8x	r13_abt: 0x%.8x	r13_irq: 0x%.8x	r13_und: 0x%.8x\n", cpu->r[13], cpu->r13_fiq, cpu->r13_svc, cpu->r13_abt, cpu->r13_irq, cpu->r13_und);
-            fprintf(cpu->debug, "r14: 0x%.8x	r14_fiq: 0x%.8x	r14_svc: 0x%.8x	r14_abt: 0x%.8x	r14_irq: 0x%.8x	r14_und: 0x%.8x\n", cpu->r[14], cpu->r14_fiq, cpu->r14_svc, cpu->r14_abt, cpu->r14_irq, cpu->r14_und);
-            break;
-        case (MODE_SUPERVISOR):
-            fprintf(cpu->debug, "r13: 0x%.8x	r13_fiq: 0x%.8x	r13_svc: 0x%.8x	r13_abt: 0x%.8x	r13_irq: 0x%.8x	r13_und: 0x%.8x\n", cpu->r13_svc, cpu->r13_fiq, cpu->r[13], cpu->r13_abt, cpu->r13_irq, cpu->r13_und);
-            fprintf(cpu->debug, "r14: 0x%.8x	r14_fiq: 0x%.8x	r14_svc: 0x%.8x	r14_abt: 0x%.8x	r14_irq: 0x%.8x	r14_und: 0x%.8x\n", cpu->r14_svc, cpu->r14_fiq, cpu->r[14], cpu->r14_abt, cpu->r14_irq, cpu->r14_und);
-            break;
-        case (MODE_ABORT):
-            fprintf(cpu->debug, "r13: 0x%.8x	r13_fiq: 0x%.8x	r13_svc: 0x%.8x	r13_abt: 0x%.8x	r13_irq: 0x%.8x	r13_und: 0x%.8x\n", cpu->r13_abt, cpu->r13_fiq, cpu->r13_svc, cpu->r[13], cpu->r13_irq, cpu->r13_und);
-            fprintf(cpu->debug, "r14: 0x%.8x	r14_fiq: 0x%.8x	r14_svc: 0x%.8x	r14_abt: 0x%.8x	r14_irq: 0x%.8x	r14_und: 0x%.8x\n", cpu->r14_abt, cpu->r14_fiq, cpu->r14_svc, cpu->r[14], cpu->r14_irq, cpu->r14_und);
-            break;
-        case (MODE_IRQ):
-            fprintf(cpu->debug, "r13: 0x%.8x	r13_fiq: 0x%.8x	r13_svc: 0x%.8x	r13_abt: 0x%.8x	r13_irq: 0x%.8x	r13_und: 0x%.8x\n", cpu->r13_irq, cpu->r13_fiq, cpu->r13_svc, cpu->r13_abt, cpu->r[13], cpu->r13_und);
-            fprintf(cpu->debug, "r14: 0x%.8x	r14_fiq: 0x%.8x	r14_svc: 0x%.8x	r14_abt: 0x%.8x	r14_irq: 0x%.8x	r14_und: 0x%.8x\n", cpu->r14_irq, cpu->r14_fiq, cpu->r14_svc, cpu->r14_abt, cpu->r[14], cpu->r14_und);
-            break;
-        case (MODE_UNDEFINED):
-            fprintf(cpu->debug, "r13: 0x%.8x	r13_fiq: 0x%.8x	r13_svc: 0x%.8x	r13_abt: 0x%.8x	r13_irq: 0x%.8x	r13_und: 0x%.8x\n", cpu->r13_und, cpu->r13_fiq, cpu->r13_svc, cpu->r13_abt, cpu->r13_irq, cpu->r[13]);
-            fprintf(cpu->debug, "r14: 0x%.8x	r14_fiq: 0x%.8x	r14_svc: 0x%.8x	r14_abt: 0x%.8x	r14_irq: 0x%.8x	r14_und: 0x%.8x\n", cpu->r14_und, cpu->r14_fiq, cpu->r14_svc, cpu->r14_abt, cpu->r14_irq, cpu->r[14]);
-            break;
-        default:
-            break;
-    }
-    
-    fprintf(cpu->debug, "r15: 0x%.8x (%s)\n", cpu->r[15], ARMISA_disasm(cpu, cpu->instr, 8));
-    fprintf(cpu->debug, "CPSR: %s %s %s %s %s %s %s\n", (ARM_getFlag(cpu, FLAG_T)) ? "T" : "t",
-        (ARM_getFlag(cpu, FLAG_F)) ? "F" : "f",
-        (ARM_getFlag(cpu, FLAG_I)) ? "I" : "i",
-        (ARM_getFlag(cpu, FLAG_V)) ? "N" : "n",
-        (ARM_getFlag(cpu, FLAG_C)) ? "C" : "c",
-        (ARM_getFlag(cpu, FLAG_Z)) ? "Z" : "z",
-        (ARM_getFlag(cpu, FLAG_N)) ? "N" : "n");
+int ARMISA_BIC(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_LOGICAL(cpu->r[Rd] = cpu->r[Rn] & (~Op2))
 }
 
-int ARM_prefetch(ARM *cpu) {
-    if (cpu->r[15] & 3 && !ARM_getFlag(cpu, FLAG_T)) {
-        ARM_prefAbort(cpu, "fetching from an unaligned address.");
+int ARMISA_TST(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (!info->S) return 0;
+    DP_LOGICAL(cpu->r[Rn] & Op2)
+}
+
+int ARMISA_TEQ(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (!info->S) return 0;
+    DP_LOGICAL(cpu->r[Rn] ^ Op2)
+}
+
+int ARMISA_ADD(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_ARITHMETIC(cpu->r[Rd] = cpu->r[Rn] + Op2)
+}
+
+int ARMISA_ADC(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_ARITHMETIC(cpu->r[Rd] = cpu->r[Rn] + Op2 + ((cpu->cpsr >> 29) & 1))
+}
+
+int ARMISA_SUB(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_ARITHMETIC(cpu->r[Rd] = cpu->r[Rn] - Op2)
+}
+
+int ARMISA_SBC(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_ARITHMETIC(cpu->r[Rd] = cpu->r[Rn] - Op2 - ((cpu->cpsr >> 29) & 1))
+}
+
+int ARMISA_RSB(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_ARITHMETIC(cpu->r[Rd] = Op2 - cpu->r[Rn])
+}
+
+int ARMISA_RSC(ARM *cpu, ARMISA_InstrInfo *info) {
+    DP_ARITHMETIC(cpu->r[Rd] = Op2 - cpu->r[Rn] - ((cpu->cpsr >> 29) & 1))
+}
+
+int ARMISA_CMP(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (!info->S) return 0;
+    DP_ARITHMETIC(cpu->r[Rd] - Op2)
+}
+
+int ARMISA_CMN(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (!info->S) return 0;
+    DP_ARITHMETIC(cpu->r[Rd] + Op2)
+}
+
+// Branch
+int ARMISA_B(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[15] += info->offset;
+    
+    ARM_flushPipeline(cpu);
+}
+
+int ARMISA_BL(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[14] = cpu->r[15] - ((cpu->cpsr & FLAG_T) ? 2 : 4);
+    cpu->r[15] += info->offset;
+    
+    ARM_flushPipeline(cpu);
+}
+
+int ARMISA_BX(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[15] = cpu->r[info->Rn];
+    ARM_setFlag(cpu, FLAG_T, cpu->r[15] & 1);
+    
+    ARM_flushPipeline(cpu);
+}
+
+int ARMISA_BLX_reg(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[14] = cpu->r[15] - ((cpu->cpsr & FLAG_T) ? 2 : 4);
+    cpu->r[15] = cpu->r[info->Rn];
+    ARM_setFlag(cpu, FLAG_T,  cpu->r[15] & 1);
+    
+    ARM_flushPipeline(cpu);
+}
+
+int ARMISA_BLX_imm(ARM *cpu, ARMISA_InstrInfo *info) {
+    cpu->instr_cycles = 3;
+    
+    cpu->r[14] = cpu->r[15] - ((cpu->cpsr & FLAG_T) ? 2 : 4);
+    cpu->r[15] += info->offset;
+    ARM_setFlag(cpu, FLAG_T, ~(cpu->r[15] & 1));    // Switch Instruction Set (ARM => Thumb; Thumb => ARM)
+    
+    ARM_flushPipeline(cpu);
+}
+
+// Multiply
+#define MUL_DET_CYCLES \
+    if ((res >> 8 == 0xFFFFFF) || (res >> 8 == 0)) { m = 1; } \
+    else if ((res >> 16 == 0xFFFF) || (res >> 16 == 0)) { m = 2; } \
+    else if ((res >> 24 == 0xFF) || (res >> 24 == 0)) { m = 3; } \
+    else { m = 4; }
+#define MUL_R15_CHECK \
+    if ((info->Rd == 15) || (info->Rm == 15) || (info->Rs == 15) || \
+        (info->Rn == 15)) { \
+        ARM_undefined(cpu, "r15 must not be used as a register"); \
+        return -1; \
+    }
+
+int ARMISA_MUL(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (info->Rd == info->Rm) {
+        ARM_undefined(cpu, "Rd == Rm");
         return -1;
     }
     
-    Bus_read(cpu->bus, cpu->r[15], 4, &cpu->next_instr);
-    
-    cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;
-    
-    return 0;
-}
-
-int ARM_fetch(ARM *cpu) {
-    if (cpu->r[15] & 3) {
-        ARM_prefAbort(cpu, "fetching from an unaligned address.");
+    if ((info->Rd == 15) || (info->Rm == 15) || (info->Rs == 15)) {
+        ARM_undefined(cpu, "r15 must not be used as a register");
         return -1;
     }
     
-    Bus_read(cpu->bus, cpu->r[15], 4, &cpu->instr);
+    int m = 0;
+    WORD res = cpu->r[info->Rd] = cpu->r[info->Rm] * cpu->r[info->Rs];
     
-    cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;
+    MUL_DET_CYCLES
+    UPDATE_FLAGS
     
-    return 0;
+    cpu->instr_cycles = 1 + m;
 }
 
-void ARM_flushPipeline(ARM *cpu) {
-    cpu->pipeline.flushed = 1;
-    cpu->current_cycle = 0;
+int ARMISA_MLA(ARM *cpu, ARMISA_InstrInfo *info) {
+    if (info->Rd == info->Rm) {
+        ARM_undefined(cpu, "Rd == Rm");
+        return -1;
+    }
+    MUL_R15_CHECK
+    
+    int m = 0;
+    WORD res = cpu->r[info->Rd] = cpu->r[info->Rm] * cpu->r[info->Rs] + cpu->r[info->Rn];
+    
+    MUL_DET_CYCLES
+    UPDATE_FLAGS
+    
+    cpu->instr_cycles = 2 + m;
 }
 
-int ARM_getFlag(ARM *cpu, int flag_mask) {
-    return (cpu->cpsr & flag_mask) ? 1 : 0;
+int ARMISA_UMULL(ARM *cpu, ARMISA_InstrInfo *info) {
+    MUL_R15_CHECK
+    
+    uint64_t res = cpu->r[info->Rm] * cpu->r[info->Rs];
+    cpu->r[info->Rn] = res & 0xFFFFFFFF;
+    cpu->r[info->Rd] = res >> 32;
+    
+    int m = 0;
+    if (res >> 8 == 0) { m = 1; }
+    else if (res >> 16 == 0) { m = 2; } \
+    else if (res >> 24 == 0) { m = 3; } \
+    else { m = 4; }
+    cpu->instr_cycles = 2 + m;
 }
 
-void ARM_setFlag(ARM *cpu, int flag_mask, int val) {
-    if (val) { cpu->cpsr |= flag_mask; }
-    else { cpu->cpsr &= ~flag_mask; }
+int ARMISA_SMULL(ARM *cpu, ARMISA_InstrInfo *info) {
+    MUL_R15_CHECK
+    
+    int64_t res = (int32_t)cpu->r[info->Rm] * (int32_t)cpu->r[info->Rs];
+    cpu->r[info->Rn] = ((uint64_t)res) & 0xFFFFFFFF;
+    cpu->r[info->Rd] = ((uint64_t)res) >> 32;
+    
+    int m = 0;
+    MUL_DET_CYCLES
+    cpu->instr_cycles = 2 + m;
 }
 
-// Exceptions
-void ARM_reset(ARM *cpu) {
-    cpu->r14_svc = cpu->r[15];									// Store the program counter in the link register
-    ARM_switchMode(cpu, MODE_SUPERVISOR);						// Switch into supervisor mode
-    cpu->cpsr &= ~FLAG_T;										// Switch into ARM state
-    cpu->cpsr |= FLAG_I;										// Disable IRQs
-    cpu->cpsr |= FLAG_F;										// Disable FIQs
-    cpu->r[15] = cpu->vec_base + 0x00;	// Jump to the interrupt vector
-    ARM_flushPipeline(cpu);
+int ARMISA_UMLAL(ARM *cpu, ARMISA_InstrInfo *info) {
+    MUL_R15_CHECK
+    
+    uint64_t res = cpu->r[info->Rm] * cpu->r[info->Rs] + \
+        (uint64_t)(cpu->r[info->Rn] | ((uint64_t)cpu->r[info->Rd] << 32));
+    cpu->r[info->Rn] = res & 0xFFFFFFFF;
+    cpu->r[info->Rd] = res >> 32;
+    
+    int m = 0;
+    if (res >> 8 == 0) { m = 1; }
+    else if (res >> 16 == 0) { m = 2; } \
+    else if (res >> 24 == 0) { m = 3; } \
+    else { m = 4; }
+    cpu->instr_cycles = 3 + m;
 }
 
-void ARM_undefined(ARM *cpu, char *why) {
-    if (cpu->debug) fprintf(cpu->debug, "UNDEFINED because %s\n", why);
-    cpu->r14_und = cpu->r[15];
-    ARM_switchMode(cpu, MODE_UNDEFINED);	// Switch into undefined mode
-    cpu->cpsr &= ~FLAG_T;
-    cpu->cpsr |= FLAG_I;
-    cpu->r[15] = cpu->vec_base + 0x04;
-    ARM_flushPipeline(cpu);
+int ARMISA_SMLAL(ARM *cpu, ARMISA_InstrInfo *info) {
+    MUL_R15_CHECK
+    
+    int64_t res = (int32_t)cpu->r[info->Rm] * (int32_t)cpu->r[info->Rs] + \
+        (int64_t)(cpu->r[info->Rn] | ((int64_t)cpu->r[info->Rd] << 32));
+    cpu->r[info->Rn] = ((uint64_t)res) & 0xFFFFFFFF;
+    cpu->r[info->Rd] = ((uint64_t)res) >> 32;
+    
+    int m = 0;
+    MUL_DET_CYCLES
+    cpu->instr_cycles = 3 + m;
 }
 
-void ARM_SWI(ARM *cpu) {
-    cpu->r14_svc = cpu->r[15];
-    ARM_switchMode(cpu, MODE_SUPERVISOR);	// Switch into supervisor mode
-    cpu->cpsr &= ~FLAG_T;
-    cpu->cpsr |= FLAG_I;
-    cpu->r[15] = cpu->vec_base + 0x08;
-    ARM_flushPipeline(cpu);
+// Memory Access
+int ARMISA_LDR(ARM *cpu, ARMISA_InstrInfo *info) {
+    int Op2;
+    
+    if (info->op2.type == OperandType_Immediate) {
+        Op2 = cpu->r[info->Rn] + info->op2.value;
+        if (!info->U) { Op2 = Op2 - 2*info->op2.value; }
+    } else {
+        info->op2.value = cpu->r[info->Rn] + cpu->r[info->Rm];
+        if (!info->U) { Op2 = Op2 - 2*cpu->r[info->Rm]; }
+        
+        if (!info->op2.shift_src == 0) { SHIFT }
+    }
+    
+    if (info->P) {  // Pre-indexed
+        if (info->B) { Bus_read(cpu->bus, Op2, 4, &cpu->r[info->Rd]); }
+        else { Bus_read(cpu->bus, Op2, 1, &cpu->r[info->Rd]); }
+        
+        if (info->W) { cpu->r[info->Rn] = Op2; }
+    } else {    // Post-indexed
+        if (info->B) { Bus_read(cpu->bus, cpu->r[info->Rn], 4, &cpu->r[info->Rd]); }
+        else { Bus_read(cpu->bus, cpu->r[info->Rn], 1, &cpu->r[info->Rd]); }
+        cpu->r[info->Rn] = Op2;
+    }
+}
+int ARMISA_STR(ARM *cpu, ARMISA_InstrInfo *info) {
+    WORD Op2;
+
+    if (info->op2.type == OperandType_Immediate) {
+        Op2 = cpu->r[info->Rn] + info->op2.value;
+        if (!info->U) { Op2 = Op2 - 2*info->op2.value; }
+    } else {
+        info->op2.value = cpu->r[info->Rn] + cpu->r[info->Rm];
+        if (!info->U) { Op2 = Op2 - 2*cpu->r[info->Rm]; }
+        
+        if (!info->op2.shift_src == 0) { SHIFT }
+    }
+
+    if (info->P) {  // Pre-indexed
+        if (!info->B) { Bus_write(cpu->bus, Op2, 4, &cpu->r[info->Rd]); }
+        else { Bus_write(cpu->bus, Op2, 1, &cpu->r[info->Rd]); }
+        
+        if (info->W) { cpu->r[info->Rn] = Op2; }
+    } else {    // Post-indexed
+        if (!info->B) { Bus_write(cpu->bus, cpu->r[info->Rn], 4, &cpu->r[info->Rd]); }
+        else { Bus_write(cpu->bus, cpu->r[info->Rn], 1, &cpu->r[info->Rd]); }
+        
+        cpu->r[info->Rn] = Op2;
+    }
 }
 
-void ARM_prefAbort(ARM *cpu, char *why) {
-    if (cpu->debug) fprintf(cpu->debug, "PREFETCH ABORT because %s\n", why);
-    cpu->r14_abt = cpu->r[15];
-    ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
-    cpu->cpsr &= ~FLAG_T;
-    cpu->cpsr |= FLAG_I;
-    cpu->r[15] = cpu->vec_base + 0x0C;
-    ARM_flushPipeline(cpu);
-}
-
-void ARM_dataAbort(ARM *cpu, char *why) {
-    if (cpu->debug) fprintf(cpu->debug, "DATA ABORT because %s\n", why);
-    cpu->r14_abt = cpu->r[15];
-    ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
-    cpu->cpsr &= ~FLAG_T;
-    cpu->cpsr |= FLAG_I;
-    cpu->r[15] = cpu->vec_base + 0x10;
-    ARM_flushPipeline(cpu);
-}
-
-void ARM_IRQ(ARM *cpu) {
-    cpu->r14_irq = cpu->r[15];
-    ARM_switchMode(cpu, MODE_IRQ);	// Switch into IRQ mode
-    cpu->cpsr &= ~FLAG_T;
-    cpu->cpsr |= FLAG_I;
-    cpu->r[15] = cpu->vec_base + 0x18;
-    ARM_flushPipeline(cpu);
-}
-
-void ARM_FIQ(ARM *cpu) {
-    cpu->r14_fiq = cpu->r[15];
-    ARM_switchMode(cpu, MODE_FIQ);	// Switch into FIQ mode
-    cpu->cpsr &= ~FLAG_T;
-    cpu->cpsr |= FLAG_I;
-    cpu->cpsr |= FLAG_F;
-    cpu->r[15] = cpu->vec_base + 0x1C;
-    ARM_flushPipeline(cpu);
+// Software Interrupt
+int ARMISA_SWI_(ARM *cpu, ARMISA_InstrInfo *info) {
+    ARM_SWI(cpu);
 }
