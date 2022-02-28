@@ -130,6 +130,7 @@ int ARM_step(ARM *cpu) {
 
 void ARM_switchMode(ARM *cpu, int new_mode) {
     int old_mode = cpu->cpsr & M;
+    if (old_mode == new_mode) return;
     
     if (new_mode == MODE_FIQ || ((new_mode == MODE_USER || new_mode == MODE_SYSTEM) && old_mode == MODE_FIQ)) {
         XCHG(cpu->r[8], cpu->r8_fiq);
@@ -225,6 +226,8 @@ void ARM_registerDump(ARM *cpu) {
 
 int ARM_prefetch(ARM *cpu) {
     if (cpu->r[15] & 3 && !ARM_getFlag(cpu, FLAG_T)) {
+        cpu->r[15] += (cpu->cpsr & FLAG_T) ? 2 : 4;     // Offset in order to bring the PC to
+                                                        // current instruction address+nn
         ARM_prefAbort(cpu, "fetching from an unaligned address.");
         return -1;
     }
@@ -238,6 +241,7 @@ int ARM_prefetch(ARM *cpu) {
 
 int ARM_fetch(ARM *cpu) {
     if (cpu->r[15] & 3) {
+        cpu->r[15] += (cpu->cpsr & FLAG_T) ? 4 : 8;
         ARM_prefAbort(cpu, "fetching from an unaligned address.");
         return -1;
     }
@@ -276,7 +280,7 @@ void ARM_reset(ARM *cpu) {
 
 void ARM_undefined(ARM *cpu, char *why) {
     if (cpu->debug) fprintf(cpu->debug, "UNDEFINED because %s\n", why);
-    cpu->r14_und = cpu->r[15];
+    cpu->r14_und = cpu->r[15] - 4;
     ARM_switchMode(cpu, MODE_UNDEFINED);	// Switch into undefined mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
@@ -285,7 +289,7 @@ void ARM_undefined(ARM *cpu, char *why) {
 }
 
 void ARM_SWI(ARM *cpu) {
-    cpu->r14_svc = cpu->r[15];
+    cpu->r14_svc = cpu->r[15] - 4;
     ARM_switchMode(cpu, MODE_SUPERVISOR);	// Switch into supervisor mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
@@ -295,7 +299,7 @@ void ARM_SWI(ARM *cpu) {
 
 void ARM_prefAbort(ARM *cpu, char *why) {
     if (cpu->debug) fprintf(cpu->debug, "PREFETCH ABORT because %s\n", why);
-    cpu->r14_abt = cpu->r[15];
+    cpu->r14_abt = cpu->r[15] - 4;
     ARM_switchMode(cpu, MODE_ABORT);	// Switch into abort mode
     cpu->cpsr &= ~FLAG_T;
     cpu->cpsr |= FLAG_I;
