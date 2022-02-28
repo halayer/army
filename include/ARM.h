@@ -30,33 +30,33 @@
 #define ARCH_ARM7	1
 
 typedef struct ARM {
-	Bus *bus;
-	
-	struct ARM_Pipeline {
-		int size;
-		int flushed;
-	} pipeline;
-	
-	int arch;
-	FILE *debug;
-	
-	WORD r[16]; // System/user registers
-	WORD cpsr;
-	
-	// Banked registers
-	WORD r13_svc, r14_svc, spsr_svc; // Supervisor
-	WORD r13_abt, r14_abt, spsr_abt; // Abort
-	WORD r13_und, r14_und, spsr_und; // Undefined
-	WORD r13_irq, r14_irq, spsr_irq; // Interrupt
-	WORD r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq, r13_fiq, r14_fiq, spsr_fiq; // Fast interrupt
-	
-	WORD vec_base;		// Vector table address
-	
-	WORD instr;				// Current instruction
-	int instr_cycles;		// Amount of clock cycles the current instruction takes
-	int current_cycle;		// Current instruction clock cycle
-	int total_cycle;		// Total clock cycle
-	WORD next_instr;		// Next instruction
+    Bus *bus;
+    
+    struct ARM_Pipeline {
+        int size;
+        int flushed;
+    } pipeline;
+    
+    int arch;
+    FILE *debug;
+    
+    WORD r[16]; // System/user registers
+    WORD cpsr;
+    
+    // Banked registers
+    WORD r13_svc, r14_svc, spsr_svc; // Supervisor
+    WORD r13_abt, r14_abt, spsr_abt; // Abort
+    WORD r13_und, r14_und, spsr_und; // Undefined
+    WORD r13_irq, r14_irq, spsr_irq; // Interrupt
+    WORD r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq, r13_fiq, r14_fiq, spsr_fiq; // Fast interrupt
+    
+    WORD vec_base;		// Vector table address
+    
+    WORD instr;				// Current instruction
+    int instr_cycles;		// Amount of clock cycles the current instruction takes
+    int current_cycle;		// Current instruction clock cycle
+    int total_cycle;		// Total clock cycle
+    WORD next_instr;		// Next instruction
 } ARM;
 
 int dbg_cycle(ARM *cpu);
@@ -66,6 +66,7 @@ int ARM_checkCondition(ARM *cpu, int cond);
 int ARM_cycle(ARM *cpu);
 int ARM_step(ARM *cpu);
 void ARM_switchMode(ARM *cpu, int new_mode);
+void ARM_hndlrExit(ARM *cpu);
 int ARM_getMode(ARM *cpu);
 void ARM_registerDump(ARM *cpu);
 int ARM_prefetch(ARM *cpu);
