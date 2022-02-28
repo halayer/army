@@ -33,12 +33,13 @@ int ARMISA_UMLAL(ARM *cpu, ARMISA_InstrInfo *info);
 int ARMISA_SMLAL(ARM *cpu, ARMISA_InstrInfo *info);
 int ARMISA_LDR(ARM *cpu, ARMISA_InstrInfo *info);
 int ARMISA_STR(ARM *cpu, ARMISA_InstrInfo *info);
+int ARMISA_SWI_(ARM *cpu, ARMISA_InstrInfo *info);
 
 
 enum ARMISA_mnemonic {
     AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC,	TST, TEQ,
     CMP, CMN, ORR, MOV, BIC, MVN, B,   BL,  BX,  BLX_reg, BLX_imm,
-    MUL, MLA, UMULL, SMULL, UMLAL, SMLAL, LDR, STR,
+    MUL, MLA, UMULL, SMULL, UMLAL, SMLAL, LDR, STR, SWI
 };
 
 cycleFunc instr_func_lookup[] = {
@@ -48,12 +49,13 @@ cycleFunc instr_func_lookup[] = {
     ARMISA_MVN, ARMISA_B,	ARMISA_BL,  ARMISA_BX,  ARMISA_BLX_reg, ARMISA_BLX_imm,
     ARMISA_MUL,	ARMISA_MLA,  ARMISA_UMULL, ARMISA_SMULL,
     ARMISA_UMLAL, ARMISA_SMLAL, ARMISA_LDR, ARMISA_STR,
+    ARMISA_SWI_,
 };
 
 char *mnemonic_lookup[] = {
     "AND", "EOR", "SUB", "RSB", "ADD", "ADC", "SBC", "RSC", "TST", "TEQ",
     "CMP", "CMN", "ORR", "MOV", "BIC", "MVN", "B",	 "BL",  "BX",  "BLX", "BLX",
-    "MUL", "MLA", "UMULL", "SMULL", "UMLAL", "SMLAL","LDR", "STR",
+    "MUL", "MLA", "UMULL", "SMULL", "UMLAL", "SMLAL","LDR", "STR", "SWI",
 };
 
 #endif
