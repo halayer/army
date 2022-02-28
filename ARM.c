@@ -163,6 +163,21 @@ void ARM_switchMode(ARM *cpu, int new_mode) {
     cpu->cpsr |= new_mode;
 }
 
+void ARM_hndlrExit(ARM *cpu) {
+    int new_mode = MODE_USER;
+    
+    switch (cpu->cpsr & M) {
+        case MODE_SUPERVISOR: new_mode = cpu->spsr_svc & M; break;
+        case MODE_ABORT: new_mode = cpu->spsr_abt & M; break;
+        case MODE_IRQ: new_mode = cpu->spsr_irq & M; break;
+        case MODE_FIQ: new_mode = cpu->spsr_fiq & M; break;
+        case MODE_UNDEFINED: new_mode = cpu->spsr_und & M; break;
+        default: break;
+    }
+    
+    ARM_switchMode(cpu, new_mode);
+}
+
 int ARM_getMode(ARM *cpu) {
     return cpu->cpsr & M;
 }
