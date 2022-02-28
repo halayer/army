@@ -37,17 +37,19 @@ int main() {
     ram.mem = (WORD *)malloc(512);
     memset((void *)ram.mem, 0, 512);
 
-    /* B 4
-    BL 8
-    BLX 0xc */
-    char prog[12] = "\xff\xff\xff\xea\xff\xff\xff\xeb\xff\xff\xff\xfa";
-    memcpy((void *)ram.mem, (void *)&prog, sizeof(prog));
+    char hndlr[4] = "\x0e\xf0\xb0\xe1";
+    memcpy((void *)ram.mem + 0x8, (void *)hndlr, sizeof(hndlr));
+    /* MOV r0, #1
+    SWI #0
+    MOV r1, #1 */
+    char prog[12] = "\x01\x00\xa0\xe3\x00\x00\x00\xef\x01\x10\xa0\xe3";
+    memcpy((void *)ram.mem + 0x10, (void *)&prog, sizeof(prog));
     
     Bus_attachComponent(&bus, &ram_comp);
 
-    ARM_reset(cpu);
+    ARM_reset(cpu); cpu->r[15] = 0x10;
     ARM_switchMode(cpu, MODE_USER);
-
+    
     do {
         ARM_step(cpu);
     } while (getchar() != 104);
